@@ -5,6 +5,7 @@ Database Manager Module
 """
 
 import os
+import sys
 import json
 import time
 import logging
@@ -17,6 +18,7 @@ try:
     import psycopg2
     from psycopg2 import OperationalError, DatabaseError
     from psycopg2.extras import RealDictCursor
+    from psycopg2.errorcodes import UNDEFINED_TABLE
     PSYCOPG2_AVAILABLE = True
 except ImportError:
     PSYCOPG2_AVAILABLE = False
@@ -59,6 +61,9 @@ class DatabaseManager:
         # 로깅 설정
         if self.logging_config.get("enable_query_log", False):
             logging.getLogger("psycopg2").setLevel(logging.DEBUG)
+        
+        # 초기화 시 테이블 존재 확인 및 생성
+        self._initialize_tables()
         
         logger.info(f"Database Manager initialized with config from {config_path}")
     
@@ -152,6 +157,28 @@ class DatabaseManager:
             logger.error(f"Failed to create tables: {e}")
             return False
     
+    def _initialize_tables(self):
+        """
+        초기화 시 테이블 존재 확인 및 생성
+        테이블 생성 실패 시 프로그램 종료
+        """
+        logger.info("Initializing database tables...")
+        
+        try:
+            if not self.test_connection():
+                logger.error("Database connection failed during initialization")
+                sys.exit(1)
+            
+            if not self.create_tables():
+                logger.error("Failed to create tables during initialization")
+                sys.exit(1)
+            
+            logger.info("Database tables initialized successfully")
+        
+        except Exception as e:
+            logger.error(f"Critical error during table initialization: {e}")
+            sys.exit(1)
+    
     def save_trading_history(self, record: TradingHistoryRecord) -> bool:
         """거래 기록 저장"""
         if not self.table_config.get("trading_history", {}).get("enabled", True):
@@ -175,6 +202,13 @@ class DatabaseManager:
                     logger.debug(f"Trading history saved: {record.symbol} {record.order_type}")
                     return True
         
+        except DatabaseError as e:
+            # 테이블 관련 에러는 프로그램 종료
+            if e.pgcode == UNDEFINED_TABLE:
+                logger.error(f"Trading history table not found. Database initialization may have failed: {e}")
+                sys.exit(1)
+            logger.error(f"Database error while saving trading history: {e}")
+            sys.exit(1)
         except Exception as e:
             logger.error(f"Failed to save trading history: {e}")
             return False
@@ -202,6 +236,13 @@ class DatabaseManager:
                     logger.debug(f"Rebalancing log saved: {record.portfolio_id}")
                     return True
         
+        except DatabaseError as e:
+            # 테이블 관련 에러는 프로그램 종료
+            if e.pgcode == UNDEFINED_TABLE:
+                logger.error(f"Rebalancing logs table not found. Database initialization may have failed: {e}")
+                sys.exit(1)
+            logger.error(f"Database error while saving rebalancing log: {e}")
+            sys.exit(1)
         except Exception as e:
             logger.error(f"Failed to save rebalancing log: {e}")
             return False
@@ -226,6 +267,13 @@ class DatabaseManager:
                     logger.debug(f"Portfolio snapshot saved: {record.portfolio_id}")
                     return True
         
+        except DatabaseError as e:
+            # 테이블 관련 에러는 프로그램 종료
+            if e.pgcode == UNDEFINED_TABLE:
+                logger.error(f"Portfolio snapshots table not found. Database initialization may have failed: {e}")
+                sys.exit(1)
+            logger.error(f"Database error while saving portfolio snapshot: {e}")
+            sys.exit(1)
         except Exception as e:
             logger.error(f"Failed to save portfolio snapshot: {e}")
             return False
@@ -251,6 +299,13 @@ class DatabaseManager:
                     conn.commit()
                     return True
         
+        except DatabaseError as e:
+            # 테이블 관련 에러는 프로그램 종료
+            if e.pgcode == UNDEFINED_TABLE:
+                logger.error(f"System logs table not found. Database initialization may have failed: {e}")
+                sys.exit(1)
+            logger.error(f"Database error while saving system log: {e}")
+            sys.exit(1)
         except Exception as e:
             logger.error(f"Failed to save system log: {e}")
             return False

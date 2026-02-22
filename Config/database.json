@@ -2,9 +2,9 @@
     "database": {
         "host": "localhost",
         "port": 5432,
-        "name": "investment_auto",
-        "user": "investment_user", 
-        "password": "your_password_here",
+        "name": "appdb",
+        "user": "appuser", 
+        "password": "",
         "sslmode": "prefer",
         "connect_timeout": 5,
         "retry_max": 3,

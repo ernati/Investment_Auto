@@ -109,13 +109,13 @@ CREATE_TABLES_SQL = {
             commission DECIMAL(15,2) DEFAULT 0,
             order_id VARCHAR(100),
             status VARCHAR(20) NOT NULL,
-            environment VARCHAR(10) NOT NULL,
-            
-            INDEX idx_trading_timestamp (timestamp),
-            INDEX idx_trading_portfolio (portfolio_id),
-            INDEX idx_trading_symbol (symbol),
-            INDEX idx_trading_environment (environment)
+            environment VARCHAR(10) NOT NULL
         );
+        
+        CREATE INDEX IF NOT EXISTS idx_trading_timestamp ON trading_history(timestamp);
+        CREATE INDEX IF NOT EXISTS idx_trading_portfolio ON trading_history(portfolio_id);
+        CREATE INDEX IF NOT EXISTS idx_trading_symbol ON trading_history(symbol);
+        CREATE INDEX IF NOT EXISTS idx_trading_environment ON trading_history(environment);
     """,
     
     'rebalancing_logs': """
@@ -130,13 +130,13 @@ CREATE_TABLES_SQL = {
             orders_executed INTEGER DEFAULT 0,
             status VARCHAR(20) NOT NULL,
             error_message TEXT,
-            environment VARCHAR(10) NOT NULL,
-            
-            INDEX idx_rebalancing_timestamp (timestamp),
-            INDEX idx_rebalancing_portfolio (portfolio_id),
-            INDEX idx_rebalancing_status (status),
-            INDEX idx_rebalancing_environment (environment)
+            environment VARCHAR(10) NOT NULL
         );
+        
+        CREATE INDEX IF NOT EXISTS idx_rebalancing_timestamp ON rebalancing_logs(timestamp);
+        CREATE INDEX IF NOT EXISTS idx_rebalancing_portfolio ON rebalancing_logs(portfolio_id);
+        CREATE INDEX IF NOT EXISTS idx_rebalancing_status ON rebalancing_logs(status);
+        CREATE INDEX IF NOT EXISTS idx_rebalancing_environment ON rebalancing_logs(environment);
     """,
     
     'portfolio_snapshots': """
@@ -146,12 +146,12 @@ CREATE_TABLES_SQL = {
             portfolio_id VARCHAR(50) NOT NULL,
             total_value DECIMAL(15,2) NOT NULL,
             positions JSON NOT NULL,
-            environment VARCHAR(10) NOT NULL,
-            
-            INDEX idx_snapshot_timestamp (timestamp),
-            INDEX idx_snapshot_portfolio (portfolio_id),
-            INDEX idx_snapshot_environment (environment)
+            environment VARCHAR(10) NOT NULL
         );
+        
+        CREATE INDEX IF NOT EXISTS idx_snapshot_timestamp ON portfolio_snapshots(timestamp);
+        CREATE INDEX IF NOT EXISTS idx_snapshot_portfolio ON portfolio_snapshots(portfolio_id);
+        CREATE INDEX IF NOT EXISTS idx_snapshot_environment ON portfolio_snapshots(environment);
     """,
     
     'system_logs': """
@@ -162,13 +162,13 @@ CREATE_TABLES_SQL = {
             module VARCHAR(100) NOT NULL,
             message TEXT NOT NULL,
             extra_data JSON,
-            environment VARCHAR(10) NOT NULL,
-            
-            INDEX idx_system_timestamp (timestamp),
-            INDEX idx_system_level (level),
-            INDEX idx_system_module (module),
-            INDEX idx_system_environment (environment)
+            environment VARCHAR(10) NOT NULL
         );
+        
+        CREATE INDEX IF NOT EXISTS idx_system_timestamp ON system_logs(timestamp);
+        CREATE INDEX IF NOT EXISTS idx_system_level ON system_logs(level);
+        CREATE INDEX IF NOT EXISTS idx_system_module ON system_logs(module);
+        CREATE INDEX IF NOT EXISTS idx_system_environment ON system_logs(environment);
     """
 }
 
