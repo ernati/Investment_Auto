@@ -16,6 +16,8 @@ from modules.kis_auth import KISAuth
 from modules.kis_diagnostic import KISDiagnostic
 from modules.kis_trading import KISTrading
 from modules.web_server import PortfolioWebServer
+from modules.db_manager import DatabaseManager
+from modules.db_models import TradingHistoryRecord, RebalancingLogRecord, PortfolioSnapshotRecord, SystemLogRecord
 
 
 def test_portfolio_trading_availability(kis_auth):
@@ -283,9 +285,153 @@ def main():
         print("-"*40)
         test_web_server(kis_auth)
         
+        # 추가 테스트: 데이터베이스 테스트
+        print()
+        print("🗄️ 데이터베이스 테스트")
+        print("-"*40)
+        test_database_data()
+        
     except Exception as e:
         logger.error(f"진단 도구 실행 중 오류: {e}")
         print(f"❌ 진단 도구 실행 실패: {e}")
+
+
+def test_database_data():
+    """
+    데이터베이스 연결 및 저장된 데이터 확인 테스트
+    BitCoin_Auto의 app.py 스타일을 참고한 DB 연결
+    """
+    try:
+        print("📊 데이터베이스 연결 테스트 시작")
+        
+        # DatabaseManager 초기화 (자동으로 테이블 생성 및 연결 확인)
+        db_manager = DatabaseManager()
+        print("✅ 데이터베이스 연결 성공")
+        
+        # 각 테이블별 데이터 확인
+        tables_data = {
+            "trading_history": "거래 기록",
+            "rebalancing_logs": "리밸런싱 로그", 
+            "portfolio_snapshots": "포트폴리오 스냅샷",
+            "system_logs": "시스템 로그"
+        }
+        
+        print("\n📋 테이블별 데이터 현황:")
+        
+        # trading_history 데이터 확인
+        try:
+            trading_data = db_manager.get_trading_history("demo_portfolio", "demo", limit=5)
+            count = len(trading_data)
+            print(f"  📈 거래 기록 (trading_history): {count}건")
+            
+            if count > 0:
+                print("     최근 거래 기록:")
+                for i, trade in enumerate(trading_data[:3], 1):
+                    symbol = trade.get('symbol', 'N/A')
+                    order_type = trade.get('order_type', 'N/A')
+                    quantity = trade.get('quantity', 0)
+                    price = trade.get('price', 0)
+                    timestamp = trade.get('timestamp', 'N/A')
+                    print(f"       {i}. {timestamp} | {symbol} {order_type} {quantity}주 @ {price:,}원")
+            else:
+                print("     ⚠️ 데이터 없음")
+                
+        except Exception as e:
+            print(f"     ❌ 거래 기록 조회 실패: {e}")
+        
+        # rebalancing_logs 데이터 확인  
+        try:
+            rebalancing_data = db_manager.get_rebalancing_logs("demo_portfolio", "demo", limit=3)
+            count = len(rebalancing_data)
+            print(f"  ⚖️ 리밸런싱 로그 (rebalancing_logs): {count}건")
+            
+            if count > 0:
+                print("     최근 리밸런싱 기록:")
+                for i, log in enumerate(rebalancing_data[:2], 1):
+                    reason = log.get('rebalance_reason', 'N/A')[:50]
+                    status = log.get('status', 'N/A')
+                    orders = log.get('orders_executed', 0)
+                    timestamp = log.get('timestamp', 'N/A')
+                    print(f"       {i}. {timestamp} | {status} | {orders}건 실행 | {reason}...")
+            else:
+                print("     ⚠️ 데이터 없음")
+                
+        except Exception as e:
+            print(f"     ❌ 리밸런싱 로그 조회 실패: {e}")
+        
+        # portfolio_snapshots 데이터 확인
+        try:
+            snapshot_data = db_manager.get_portfolio_snapshots("demo_portfolio", "demo", limit=3)
+            count = len(snapshot_data) 
+            print(f"  📸 포트폴리오 스냅샷 (portfolio_snapshots): {count}건")
+            
+            if count > 0:
+                print("     최근 스냅샷:")
+                for i, snapshot in enumerate(snapshot_data[:2], 1):
+                    total_value = snapshot.get('total_value', 0)
+                    timestamp = snapshot.get('timestamp', 'N/A')
+                    positions = snapshot.get('positions', {})
+                    position_count = len(positions) if isinstance(positions, dict) else 0
+                    print(f"       {i}. {timestamp} | 총자산: {total_value:,.0f}원 | 포지션: {position_count}개")
+            else:
+                print("     ⚠️ 데이터 없음")
+                
+        except Exception as e:
+            print(f"     ❌ 포트폴리오 스냅샷 조회 실패: {e}")
+        
+        # 테스트용 샘플 데이터 생성
+        print("\n🧪 테스트 데이터 생성:")
+        
+        try:
+            # 샘플 거래 기록 생성
+            sample_trade = TradingHistoryRecord(
+                portfolio_id="test_portfolio",
+                symbol="005930",
+                order_type="buy",
+                quantity=1.0,
+                price=75000.0,
+                total_amount=75000.0,
+                commission=150.0,
+                order_id="TEST_ORDER_001",
+                status="completed",
+                environment="demo"
+            )
+            
+            if db_manager.save_trading_history(sample_trade):
+                print("  ✅ 샘플 거래 기록 저장 성공")
+            else:
+                print("  ❌ 샘플 거래 기록 저장 실패")
+                
+        except Exception as e:
+            print(f"  ❌ 샘플 데이터 생성 실패: {e}")
+        
+        try:
+            # 샘플 시스템 로그 생성
+            sample_log = SystemLogRecord(
+                level="INFO",
+                module="kis_debug",
+                message="데이터베이스 테스트 실행",
+                environment="demo",
+                extra_data={"test_type": "db_data_check", "success": True}
+            )
+            
+            if db_manager.save_system_log(sample_log):
+                print("  ✅ 샘플 시스템 로그 저장 성공")
+            else:
+                print("  ❌ 샘플 시스템 로그 저장 실패")
+                
+        except Exception as e:
+            print(f"  ❌ 샘플 로그 생성 실패: {e}")
+        
+        print("\n✅ 데이터베이스 테스트 완료")
+        return True
+        
+    except SystemExit:
+        print("❌ 데이터베이스 초기화 실패 - 프로그램 종료")
+        return False
+    except Exception as e:
+        print(f"❌ 데이터베이스 테스트 실패: {e}")
+        return False
 
 
 def test_web_server(kis_auth):
