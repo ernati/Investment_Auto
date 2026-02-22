@@ -1,0 +1,54 @@
+2026-02-12 00:42:34,347 - __main__ - INFO - Starting Portfolio Rebalancing Application
+2026-02-12 00:42:34,348 - modules.config_loader - INFO - Loaded basic config from D:\dev\repos\Investment_Auto\Config\config_basic.json
+2026-02-12 00:42:34,348 - modules.config_loader - INFO - Loaded advanced config from D:\dev\repos\Investment_Auto\Config\config_advanced.json
+2026-02-12 00:42:34,348 - modules.config_loader - INFO - Config files merged (advanced overrides basic)
+2026-02-12 00:42:34,349 - modules.config_loader - INFO - Loaded basic config from D:\dev\repos\Investment_Auto\Config\config_basic.json
+2026-02-12 00:42:34,349 - modules.config_loader - INFO - Loaded advanced config from D:\dev\repos\Investment_Auto\Config\config_advanced.json
+2026-02-12 00:42:34,350 - modules.config_loader - INFO - Config files merged (advanced overrides basic)
+2026-02-12 00:42:34,350 - __main__ - INFO - Configuration loaded successfully
+2026-02-12 00:42:34,363 - modules.config_loader - INFO - Loaded config from D:\dev\repos\Investment_Auto\Config\config.json
+2026-02-12 00:42:34,364 - modules.config_loader - INFO - Loaded config from D:\dev\repos\Investment_Auto\Config\config.json
+2026-02-12 00:42:34,366 - modules.config_validator - INFO - All validations passed
+2026-02-12 00:42:34,367 - __main__ - INFO - KIS Authentication initialized
+2026-02-12 00:42:34,376 - modules.scheduler - INFO - Scheduler initialized: timezone=Asia/Seoul, hourly_enabled=True, max_runs_per_day=24
+2026-02-12 00:42:34,376 - modules.rebalancing_engine - INFO - RebalancingEngine initialized: mode=HYBRID, band_type=ABS, band_value=0.05
+2026-02-12 00:42:34,376 - modules.order_executor - INFO - OrderExecutor initialized: order_type=market
+2026-02-12 00:42:34,377 - __main__ - INFO - All modules initialized successfully
+2026-02-12 00:42:34,377 - __main__ - INFO - Configuration validation completed successfully
+2026-02-20 22:25:00,552 - __main__ - INFO - Starting Portfolio Rebalancing Application
+2026-02-20 22:25:00,560 - modules.config_loader - INFO - Loaded basic config from D:\dev\repos\Investment_Auto\Config\config_basic.json
+2026-02-20 22:25:00,569 - modules.config_loader - INFO - Loaded advanced config from D:\dev\repos\Investment_Auto\Config\config_advanced.json
+2026-02-20 22:25:00,569 - modules.config_loader - INFO - Config files merged (advanced overrides basic)
+2026-02-20 22:25:00,569 - modules.config_loader - INFO - Loaded basic config from D:\dev\repos\Investment_Auto\Config\config_basic.json
+2026-02-20 22:25:00,569 - modules.config_loader - INFO - Loaded advanced config from D:\dev\repos\Investment_Auto\Config\config_advanced.json
+2026-02-20 22:25:00,569 - modules.config_loader - INFO - Config files merged (advanced overrides basic)
+2026-02-20 22:25:00,569 - __main__ - INFO - Configuration loaded successfully
+2026-02-20 22:25:00,569 - __main__ - INFO - Using environment from command line: demo
+2026-02-20 22:25:00,580 - modules.config_loader - INFO - Loaded config from D:\dev\repos\Investment_Auto\Config\config.json
+2026-02-20 22:25:00,581 - modules.config_loader - INFO - Loaded config from D:\dev\repos\Investment_Auto\Config\config.json
+2026-02-20 22:25:00,582 - modules.config_validator - INFO - Asset allocation by category: {'stocks': 1.0, 'bonds': 0.0}
+2026-02-20 22:25:00,582 - modules.config_validator - INFO - Total portfolio weight: 1.000000
+2026-02-20 22:25:00,582 - modules.config_validator - INFO - All validations passed
+2026-02-20 22:25:00,583 - __main__ - INFO - KIS Authentication initialized
+2026-02-20 22:25:00,590 - modules.scheduler - INFO - Scheduler initialized: timezone=Asia/Seoul, hourly_enabled=True, max_runs_per_day=24
+2026-02-20 22:25:00,590 - modules.rebalancing_engine - INFO - RebalancingEngine initialized: mode=HYBRID, band_type=ABS, band_value=0.05
+2026-02-20 22:25:00,590 - modules.order_executor - INFO - OrderExecutor initialized: order_type=market
+2026-02-20 22:25:00,591 - modules.web_server - INFO - Web server initialized for demo environment
+2026-02-20 22:25:00,592 - __main__ - INFO - Web server initialized on port 5002
+2026-02-20 22:25:00,592 - __main__ - INFO - All modules initialized successfully
+2026-02-20 22:25:00,592 - __main__ - INFO - Starting scheduler mode
+2026-02-20 22:25:00,592 - __main__ - INFO - Starting scheduler with 60s check interval
+2026-02-20 22:25:00,593 - modules.web_server - INFO - Web server starting on http://127.0.0.1:5002
+2026-02-20 22:25:00,600 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5002
+2026-02-20 22:25:00,600 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2026-02-20 22:25:02,594 - __main__ - INFO - 📊 Portfolio dashboard: http://127.0.0.1:5002
+2026-02-20 22:25:02,594 - __main__ - INFO - 🔄 Web server started alongside rebalancing scheduler
+2026-02-20 22:25:02,594 - __main__ - INFO - Running rebalancing cycle
+2026-02-20 22:25:02,594 - __main__ - INFO - Next execution scheduled: 2026-02-20 23:00:00+09:00
+2026-02-20 22:25:33,075 - werkzeug - INFO - 127.0.0.1 - - [20/Feb/2026 22:25:33] "GET / HTTP/1.1" 200 -
+2026-02-20 22:25:33,152 - werkzeug - INFO - 127.0.0.1 - - [20/Feb/2026 22:25:33] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-02-20 22:25:33,779 - modules.kis_portfolio_fetcher - INFO - Account balance fetched successfully: 모의투자 조회가 완료되었습니다.                                                 
+2026-02-20 22:25:34,423 - modules.kis_portfolio_fetcher - INFO - Holdings fetched: 3 tickers
+2026-02-20 22:25:36,185 - modules.web_server - INFO - Portfolio data updated: 3 positions, total assets: 10,729,670
+2026-02-20 22:25:36,185 - werkzeug - INFO - 127.0.0.1 - - [20/Feb/2026 22:25:36] "GET /api/portfolio HTTP/1.1" 200 -

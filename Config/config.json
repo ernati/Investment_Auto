@@ -1,0 +1,18 @@
+{
+    "kis": {
+        "real": {
+            "appkey": "YOUR_REAL_APP_KEY",
+            "appsecret": "YOUR_REAL_APP_SECRET",
+            "account": "YOUR_ACCOUNT_NUMBER",
+            "product": "01",
+            "htsid": "YOUR_HTS_ID"
+        },
+        "demo": {
+            "appkey": "PSntgSM3B0HuXZoCFLgZBzDJ7gp9RCN6kOBp",
+            "appsecret": "7+JJGCUeH67ViXwpzCe92jOxEhcjLhOqWSmhby0cwcjSFoPGUbhwXElfq3hj26wDXmsfY1omIj+Md5zSCAfheP1bH0/jve/yW0OpqUOCjLxGY97wzu26GFBLP+h6RzeGc/W4KbCreMUCmqVV9L+Xy2HjCyH1z0qIkH7E+tie7CdE4wr/eFc=",
+            "account": "50162038",
+            "product": "01",
+            "htsid": "ernati"
+        }
+    }
+}

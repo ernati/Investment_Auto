@@ -1,0 +1,36 @@
+{
+    "database": {
+        "host": "localhost",
+        "port": 5432,
+        "name": "investment_auto",
+        "user": "investment_user", 
+        "password": "your_password_here",
+        "sslmode": "prefer",
+        "connect_timeout": 5,
+        "retry_max": 3,
+        "retry_backoff": 0.5
+    },
+    "table_config": {
+        "trading_history": {
+            "enabled": true,
+            "retention_days": 365
+        },
+        "rebalancing_logs": {
+            "enabled": true,
+            "retention_days": 365
+        },
+        "portfolio_snapshots": {
+            "enabled": true,
+            "retention_days": 90
+        },
+        "system_logs": {
+            "enabled": true,
+            "retention_days": 30
+        }
+    },
+    "logging": {
+        "level": "INFO",
+        "enable_query_log": false,
+        "max_query_length": 1000
+    }
+}

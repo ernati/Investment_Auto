@@ -1,0 +1,42 @@
+{
+  "portfolio_id": "portfolio-001",
+  "base_currency": "KRW",
+  "target_weights": {
+    "stocks": {
+      "005930": 0.40,
+      "000660": 0.3,
+      "035420": 0.3
+    },
+    "bonds": {
+      "KR103502GA34": 0.0
+    }
+  },
+  "rebalance": {
+    "mode": "HYBRID",
+    "price_source": "last",
+    "band": {
+      "type": "ABS",
+      "value": 0.05
+    },
+    "schedule": {
+      "timezone": "Asia/Seoul",
+      "run_times": [],
+      "calendar_rules": {
+        "month_end": false,
+        "quarter_end": false,
+        "weekly": {
+          "enabled": false,
+          "weekday": "FRI"
+        },
+        "hourly": {
+          "enabled": true,
+          "minute": 0
+        }
+      }
+    }
+  },
+  "trade": {
+    "cash_buffer_ratio": 0.02,
+    "min_order_krw": 100000
+  }
+}

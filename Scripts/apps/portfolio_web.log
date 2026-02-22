@@ -1,0 +1,74 @@
+2026-02-20 22:23:21,369 - __main__ - INFO - Portfolio Web App initialized for demo environment on 127.0.0.1:5001
+2026-02-20 22:23:21,369 - __main__ - INFO - Starting Portfolio Web Application...
+2026-02-20 22:23:21,378 - modules.config_loader - INFO - Loaded config from D:\dev\repos\Investment_Auto\Config\config.json
+2026-02-20 22:23:21,378 - modules.web_server - ERROR - Failed to initialize KIS API: KISAuth.__init__() missing 2 required positional arguments: 'appsecret' and 'account'
+2026-02-20 22:23:21,379 - modules.web_server - INFO - Web server starting on http://127.0.0.1:5001
+2026-02-20 22:23:21,399 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5001
+2026-02-20 22:23:21,399 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2026-02-20 22:23:23,380 - __main__ - INFO - ✅ Web server started successfully!
+2026-02-20 22:23:23,380 - __main__ - INFO - 📊 Portfolio dashboard: http://127.0.0.1:5001
+2026-02-20 22:23:23,380 - __main__ - INFO - 💻 Environment: DEMO
+2026-02-20 22:23:23,380 - __main__ - INFO - 🔄 Press Ctrl+C to stop
+2026-02-20 22:24:09,780 - __main__ - INFO - Portfolio Web App initialized for demo environment on 127.0.0.1:5001
+2026-02-20 22:24:09,780 - __main__ - INFO - Starting Portfolio Web Application...
+2026-02-20 22:24:09,781 - modules.config_loader - INFO - Loaded config from D:\dev\repos\Investment_Auto\Config\config.json
+2026-02-20 22:24:09,781 - modules.web_server - INFO - Web server initialized for demo environment
+2026-02-20 22:24:09,782 - modules.web_server - INFO - Web server starting on http://127.0.0.1:5001
+2026-02-20 22:24:09,791 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5001
+2026-02-20 22:24:09,791 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2026-02-20 22:24:11,784 - __main__ - INFO - ✅ Web server started successfully!
+2026-02-20 22:24:11,784 - __main__ - INFO - 📊 Portfolio dashboard: http://127.0.0.1:5001
+2026-02-20 22:24:11,784 - __main__ - INFO - 💻 Environment: DEMO
+2026-02-20 22:24:11,784 - __main__ - INFO - 🔄 Press Ctrl+C to stop
+2026-02-20 22:24:35,668 - werkzeug - INFO - 127.0.0.1 - - [20/Feb/2026 22:24:35] "GET / HTTP/1.1" 200 -
+2026-02-20 22:24:35,755 - werkzeug - INFO - 127.0.0.1 - - [20/Feb/2026 22:24:35] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-02-20 22:24:36,375 - modules.kis_portfolio_fetcher - INFO - Account balance fetched successfully: 모의투자 조회가 완료되었습니다.                                                 
+2026-02-20 22:24:36,998 - modules.kis_portfolio_fetcher - INFO - Holdings fetched: 3 tickers
+2026-02-20 22:24:38,750 - modules.web_server - INFO - Portfolio data updated: 3 positions, total assets: 10,729,670
+2026-02-20 22:24:38,751 - werkzeug - INFO - 127.0.0.1 - - [20/Feb/2026 22:24:38] "GET /api/portfolio HTTP/1.1" 200 -
+2026-02-20 22:44:10,093 - __main__ - INFO - Portfolio Web App initialized for demo environment on 127.0.0.1:5003
+2026-02-20 22:44:10,093 - __main__ - INFO - Starting Portfolio Web Application...
+2026-02-20 22:44:10,093 - modules.config_loader - INFO - Loaded config from D:\dev\repos\Investment_Auto\Config\config.json
+2026-02-20 22:44:10,094 - modules.web_server - INFO - Web server initialized for demo environment
+2026-02-20 22:44:10,095 - modules.web_server - INFO - Web server starting on http://127.0.0.1:5003
+2026-02-20 22:44:10,102 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5003
+2026-02-20 22:44:10,102 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2026-02-20 22:44:12,095 - __main__ - INFO - ✅ Web server started successfully!
+2026-02-20 22:44:12,095 - __main__ - INFO - 📊 Portfolio dashboard: http://127.0.0.1:5003
+2026-02-20 22:44:12,095 - __main__ - INFO - 💻 Environment: DEMO
+2026-02-20 22:44:12,095 - __main__ - INFO - 🔄 Press Ctrl+C to stop
+2026-02-20 22:44:48,869 - werkzeug - INFO - 127.0.0.1 - - [20/Feb/2026 22:44:48] "GET / HTTP/1.1" 200 -
+2026-02-20 22:44:48,936 - werkzeug - INFO - 127.0.0.1 - - [20/Feb/2026 22:44:48] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-02-20 22:44:49,580 - modules.kis_portfolio_fetcher - INFO - Account balance fetched successfully: 모의투자 조회가 완료되었습니다.                                                 
+2026-02-20 22:44:49,580 - modules.kis_portfolio_fetcher - INFO - === Account Balance Fields DEBUG ===
+2026-02-20 22:44:49,580 - modules.kis_portfolio_fetcher - INFO -   dnca_tot_amt: -25793330
+2026-02-20 22:44:49,581 - modules.kis_portfolio_fetcher - INFO -   nxdy_excc_amt: -25793330
+2026-02-20 22:44:49,581 - modules.kis_portfolio_fetcher - INFO -   prvs_rcdl_excc_amt: -25793330
+2026-02-20 22:44:49,581 - modules.kis_portfolio_fetcher - INFO -   cma_evlu_amt: 0
+2026-02-20 22:44:49,581 - modules.kis_portfolio_fetcher - INFO -   bfdy_buy_amt: 0
+2026-02-20 22:44:49,581 - modules.kis_portfolio_fetcher - INFO -   thdt_buy_amt: 0
+2026-02-20 22:44:49,581 - modules.kis_portfolio_fetcher - INFO -   nxdy_auto_rdpt_amt: 0
+2026-02-20 22:44:49,581 - modules.kis_portfolio_fetcher - INFO -   bfdy_sll_amt: 0
+2026-02-20 22:44:49,582 - modules.kis_portfolio_fetcher - INFO -   thdt_sll_amt: 0
+2026-02-20 22:44:49,582 - modules.kis_portfolio_fetcher - INFO -   d2_auto_rdpt_amt: 0
+2026-02-20 22:44:49,582 - modules.kis_portfolio_fetcher - INFO -   bfdy_tlex_amt: 0
+2026-02-20 22:44:49,582 - modules.kis_portfolio_fetcher - INFO -   thdt_tlex_amt: 0
+2026-02-20 22:44:49,582 - modules.kis_portfolio_fetcher - INFO -   tot_loan_amt: 0
+2026-02-20 22:44:49,582 - modules.kis_portfolio_fetcher - INFO -   scts_evlu_amt: 36523000
+2026-02-20 22:44:49,582 - modules.kis_portfolio_fetcher - INFO -   tot_evlu_amt: 10729670
+2026-02-20 22:44:49,583 - modules.kis_portfolio_fetcher - INFO -   nass_amt: 10729670
+2026-02-20 22:44:49,583 - modules.kis_portfolio_fetcher - INFO -   fncg_gld_auto_rdpt_yn: 
+2026-02-20 22:44:49,583 - modules.kis_portfolio_fetcher - INFO -   pchs_amt_smtl_amt: 35788250
+2026-02-20 22:44:49,583 - modules.kis_portfolio_fetcher - INFO -   evlu_amt_smtl_amt: 36523000
+2026-02-20 22:44:49,583 - modules.kis_portfolio_fetcher - INFO -   evlu_pfls_smtl_amt: 734750
+2026-02-20 22:44:49,583 - modules.kis_portfolio_fetcher - INFO -   tot_stln_slng_chgs: 0
+2026-02-20 22:44:49,584 - modules.kis_portfolio_fetcher - INFO -   bfdy_tot_asst_evlu_amt: 10057670
+2026-02-20 22:44:49,584 - modules.kis_portfolio_fetcher - INFO -   asst_icdc_amt: 672000
+2026-02-20 22:44:49,584 - modules.kis_portfolio_fetcher - INFO -   asst_icdc_erng_rt: 6.68146797
+2026-02-20 22:44:49,584 - modules.kis_portfolio_fetcher - INFO - === End of Account Balance Fields ===
+2026-02-20 22:44:50,230 - modules.kis_portfolio_fetcher - INFO - Holdings fetched: 3 tickers
+2026-02-20 22:44:52,022 - modules.web_server - INFO - Portfolio data updated: 3 positions, total assets: 10,729,670
+2026-02-20 22:44:52,022 - werkzeug - INFO - 127.0.0.1 - - [20/Feb/2026 22:44:52] "GET /api/portfolio HTTP/1.1" 200 -

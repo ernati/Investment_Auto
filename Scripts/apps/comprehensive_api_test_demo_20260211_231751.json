@@ -1,0 +1,164 @@
+{
+  "summary": {
+    "environment": "demo",
+    "timestamp": "2026-02-11T23:17:51.634645",
+    "total_tests": 9,
+    "passed_tests": 4,
+    "failed_tests": 5,
+    "success_rate": 0.4444444444444444,
+    "category_results": {
+      "Account Balance Variations": 1,
+      "Multiple Stock Prices": 6,
+      "Order Validation": 1,
+      "Market Data": 0,
+      "Extended APIs": 0
+    }
+  },
+  "failed_by_error_type": {
+    "API error": [
+      "Account Balance (CTRP6504R)",
+      "Holiday Check",
+      "Market Time Data"
+    ],
+    "HTTP error": [
+      "Order Inquiry",
+      "Stock Search"
+    ]
+  },
+  "detailed_results": [
+    {
+      "test_name": "Authentication",
+      "success": true,
+      "message": "Successfully obtained access token",
+      "timestamp": "2026-02-11T23:17:43.750844",
+      "details": {
+        "token_length": 346
+      },
+      "error_details": null
+    },
+    {
+      "test_name": "Account Balance (CTRP6504R)",
+      "success": false,
+      "message": "API error: ERROR : INPUT_FIELD_NAME WCRC_FRCR_DVSN_CD (rt_cd=2)",
+      "timestamp": "2026-02-11T23:17:43.965600",
+      "details": {},
+      "error_details": "{'rt_cd': '2', 'msg_cd': 'OPSQ2001', 'msg1': 'ERROR : INPUT_FIELD_NAME WCRC_FRCR_DVSN_CD'}"
+    },
+    {
+      "test_name": "Account Info via Holdings (TTTC8434R)",
+      "success": true,
+      "message": "Holdings: 0, Total: 10000000, Cash: 10000000",
+      "timestamp": "2026-02-11T23:17:44.146603",
+      "details": {
+        "holdings_count": 0,
+        "total_assets": "10000000",
+        "cash": "10000000",
+        "has_account_summary": true
+      },
+      "error_details": null
+    },
+    {
+      "test_name": "Multiple Stock Prices",
+      "success": true,
+      "message": "Success: 6/10 tickers",
+      "timestamp": "2026-02-11T23:17:47.173542",
+      "details": {
+        "successful_tickers": [
+          {
+            "ticker": "005930",
+            "price": "167800",
+            "name": "N/A"
+          },
+          {
+            "ticker": "000660",
+            "price": "860000",
+            "name": "N/A"
+          },
+          {
+            "ticker": "005380",
+            "price": "509000",
+            "name": "N/A"
+          },
+          {
+            "ticker": "068270",
+            "price": "239500",
+            "name": "N/A"
+          },
+          {
+            "ticker": "006400",
+            "price": "377000",
+            "name": "N/A"
+          },
+          {
+            "ticker": "051910",
+            "price": "322500",
+            "name": "N/A"
+          }
+        ],
+        "failed_tickers": [
+          {
+            "ticker": "035420",
+            "error": "HTTP error: 500 Server Error: Internal Server Error for url: https://openapivts.koreainvestment.com:29443/uapi/domestic-stock/v1/quotations/inquire-price?fid_cond_mrkt_div_code=J&fid_input_iscd=035420"
+          },
+          {
+            "ticker": "035720",
+            "error": "HTTP error: 500 Server Error: Internal Server Error for url: https://openapivts.koreainvestment.com:29443/uapi/domestic-stock/v1/quotations/inquire-price?fid_cond_mrkt_div_code=J&fid_input_iscd=035720"
+          },
+          {
+            "ticker": "207940",
+            "error": "HTTP error: 500 Server Error: Internal Server Error for url: https://openapivts.koreainvestment.com:29443/uapi/domestic-stock/v1/quotations/inquire-price?fid_cond_mrkt_div_code=J&fid_input_iscd=207940"
+          },
+          {
+            "ticker": "012330",
+            "error": "HTTP error: 500 Server Error: Internal Server Error for url: https://openapivts.koreainvestment.com:29443/uapi/domestic-stock/v1/quotations/inquire-price?fid_cond_mrkt_div_code=J&fid_input_iscd=012330"
+          }
+        ],
+        "success_rate": "60.0%"
+      },
+      "error_details": null
+    },
+    {
+      "test_name": "Order Inquiry",
+      "success": false,
+      "message": "HTTP error: 404 Client Error: Not Found for url: https://openapivts.koreainvestment.com:29443/uapi/domestic-stock/v1/trading/inquire-orders?cano=50162038&acnt_prdt_cd=01&inqr_strt_dt=20260211&inqr_end_dt=20260211&sll_buy_dvsn=&inqr_dvsn=00&pdno=&ccld_dvsn=&ord_gno_brno=&odno=&inqr_dvsn_3=00&inqr_dvsn_1=&ctx_area_fk100=&ctx_area_nk100=",
+      "timestamp": "2026-02-11T23:17:48.237419",
+      "details": {},
+      "error_details": null
+    },
+    {
+      "test_name": "Order Quantity Check",
+      "success": true,
+      "message": "Max orderable quantity for 005930: 0",
+      "timestamp": "2026-02-11T23:17:48.362419",
+      "details": {
+        "max_quantity": "0",
+        "ticker": "005930"
+      },
+      "error_details": null
+    },
+    {
+      "test_name": "Holiday Check",
+      "success": false,
+      "message": "API error: 없는 서비스 코드 입니다. (rt_cd=1)",
+      "timestamp": "2026-02-11T23:17:49.437139",
+      "details": {},
+      "error_details": null
+    },
+    {
+      "test_name": "Market Time Data",
+      "success": false,
+      "message": "API error:  (rt_cd=)",
+      "timestamp": "2026-02-11T23:17:49.535163",
+      "details": {},
+      "error_details": null
+    },
+    {
+      "test_name": "Stock Search",
+      "success": false,
+      "message": "HTTP error: 500 Server Error: Internal Server Error for url: https://openapivts.koreainvestment.com:29443/uapi/domestic-stock/v1/quotations/search-stock-info?prdt_type_cd=300&micr_tp_cd=E&prdt_name=%EC%82%BC%EC%84%B1&prdt_name_eng=&prdt_shrn_cd=&std_pdno=&schd_div_cd=",
+      "timestamp": "2026-02-11T23:17:50.633620",
+      "details": {},
+      "error_details": null
+    }
+  ]
+}

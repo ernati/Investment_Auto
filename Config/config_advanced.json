@@ -1,0 +1,51 @@
+{
+  "run_limit": {
+    "max_runs_per_day": 24
+  },
+  "order_policy": {
+    "order_type": "market",
+    "limit_order_policy": {
+      "timeout_sec": 120,
+      "retry_count": 2,
+      "retry_mode": "switch_to_market"
+    }
+  },
+  "risk_guardrails": {
+    "max_turnover_per_run": 1.0,
+    "max_orders_per_run": 30,
+    "max_single_order_krw": 5000000,
+    "market_safety": {
+      "halt_on_suspended": false,
+      "exclude_suspended_tickers": true,
+      "intraday_drop_halt_pct": 0.1
+    }
+  },
+  "cost_model": {
+    "fee_rate": 0.00015,
+    "tax_rate_sell": 0.0,
+    "slippage_rate": 0.0005,
+    "reserve_cost_buffer_ratio": 0.002
+  },
+  "logging": {
+    "level": "INFO",
+    "audit_log_path": "./logs/audit.log"
+  },
+  "alerts": {
+    "enabled": false,
+    "channels": [
+      "console"
+    ]
+  },
+  "integrations": {
+    "market_data": {
+      "provider": "YOUR_MARKET_DATA_PROVIDER",
+      "endpoint": ""
+    },
+    "broker": {
+      "provider": "YOUR_BROKER_PROVIDER",
+      "account_id": "ACCOUNT-001",
+      "api_key_ref": "ENV:BROKER_API_KEY",
+      "secret_ref": "ENV:BROKER_API_SECRET"
+    }
+  }
+}

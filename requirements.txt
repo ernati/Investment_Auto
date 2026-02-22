@@ -1,0 +1,25 @@
+# Investment Auto Dependencies
+# Base dependencies from open-trading-api
+certifi==2025.7.9
+charset-normalizer==3.4.2
+idna==3.10
+numpy==2.3.1
+pandas==2.3.1
+pycryptodome==3.23.0
+python-dateutil==2.9.0.post0
+pytz==2025.2
+pyyaml==6.0.2
+requests==2.32.4
+six==1.17.0
+tzdata==2025.2
+urllib3==2.5.0
+websockets==15.0.1
+
+# Additional dependencies for Investment Auto
+Flask==3.1.0
+Werkzeug==3.1.3
+Jinja2==3.1.5
+MarkupSafe==3.0.2
+blinker==1.9.0
+click==8.1.8
+itsdangerous==2.2.0
