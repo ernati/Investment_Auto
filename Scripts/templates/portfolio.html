@@ -154,6 +154,63 @@
             margin: 1rem 0;
         }
         
+        .warning {
+            color: #856404;
+        }
+        
+        .filter-section {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .filter-section label {
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .filter-section select, .filter-section input {
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        
+        .pagination button {
+            padding: 0.5rem 1rem;
+            border: 1px solid #ddd;
+            background: white;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        
+        .pagination button:hover:not(:disabled) {
+            background: #f8f9fa;
+        }
+        
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .pagination .current-page {
+            font-weight: 600;
+            color: #667eea;
+        }
+        
         .last-update {
             color: #666;
             font-size: 0.9rem;
@@ -182,6 +239,59 @@
             color: #666;
             margin-left: 1rem;
         }
+        
+        /* 탭 스타일 */
+        .tabs {
+            display: flex;
+            background: white;
+            border-radius: 12px 12px 0 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 0;
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 1rem 2rem;
+            background: #f8f9fa;
+            border: none;
+            cursor: pointer;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s ease;
+            border-radius: 12px 12px 0 0;
+        }
+        
+        .tab:first-child {
+            border-radius: 12px 0 0 0;
+        }
+        
+        .tab:last-child {
+            border-radius: 0 12px 0 0;
+        }
+        
+        .tab.active {
+            background: white;
+            color: #667eea;
+            box-shadow: 0 -2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .tab:hover:not(.active) {
+            background: #e9ecef;
+        }
+        
+        .tab-content {
+            background: white;
+            border-radius: 0 0 12px 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -191,80 +301,708 @@
                 <span class="env-badge">{{ env.upper() }}</span>
             </h1>
             <div style="margin-top: 1rem; opacity: 0.9;">
-                실시간 자산 현황 대시보드
+                실시간 자산 현황 및 데이터베이스 모니터링 시스템
             </div>
         </div>
         
-        <button class="refresh-btn" onclick="refreshData()">새로고침</button>
-        <span class="auto-refresh">(자동 새로고침: 30초)</span>
-        
-        <div id="loading" class="loading">
-            <div>데이터를 불러오는 중...</div>
+        <!-- 탭 네비게이션 -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('dashboard')">
+                📊 실시간 대시보드
+            </button>
+            <button class="tab" onclick="switchTab('database')">
+                🗄️ 데이터베이스
+            </button>
         </div>
         
-        <div id="content" style="display: none;">
-            <!-- 요약 카드들 -->
+        <!-- 대시보드 탭 내용 -->
+        <div id="dashboard" class="tab-content active">
+            <button class="refresh-btn" onclick="refreshData()">새로고침</button>
+            <span class="auto-refresh">(자동 새로고침: 30초)</span>
+            
+            <div id="loading" class="loading">
+                <div>데이터를 불러오는 중...</div>
+            </div>
+            
+            <div id="content" style="display: none;">
+                <!-- 요약 카드들 -->
+                <div class="summary-cards">
+                    <div class="card">
+                        <h3>총 자산</h3>
+                        <div class="value" id="totalAssets">-</div>
+                    </div>
+                    <div class="card">
+                        <h3>현금</h3>
+                        <div class="value" id="cash">-</div>
+                    </div>
+                    <div class="card">
+                        <h3>주식 평가액</h3>
+                        <div class="value" id="stockValue">-</div>
+                    </div>
+                    <div class="card">
+                        <h3>보유 종목 수</h3>
+                        <div class="value" id="positionCount">-</div>
+                    </div>
+                </div>
+                
+                <!-- 자산 비율 차트 -->
+                <div class="chart-container">
+                    <h3 style="margin: 0 0 1rem 0;">자산 배분</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="assetChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- 보유 종목 테이블 -->
+                <div class="positions-table">
+                    <div class="table-header">
+                        <h3>보유 종목</h3>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>종목코드</th>
+                                <th>보유수량</th>
+                                <th>현재가</th>
+                                <th>평가금액</th>
+                                <th>비율</th>
+                            </tr>
+                        </thead>
+                        <tbody id="positionsTable">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="last-update" id="lastUpdate"></div>
+        </div>
+        
+        <!-- 데이터베이스 탭 내용 -->
+        <div id="database" class="tab-content">
+            <div id="db-loading" class="loading" style="display: none;">
+                <div>데이터베이스 정보를 불러오는 중...</div>
+            </div>
+            
+            <!-- DB 탭의 내용은 다음 단계에서 추가 -->
             <div class="summary-cards">
                 <div class="card">
-                    <h3>총 자산</h3>
-                    <div class="value" id="totalAssets">-</div>
+                    <h3>거래 기록</h3>
+                    <div class="value" id="tradingCount">-</div>
+                    <p style="margin: 0.5rem 0 0 0; color: #666; font-size: 0.9rem;">최근 거래 건수</p>
                 </div>
                 <div class="card">
-                    <h3>현금</h3>
-                    <div class="value" id="cash">-</div>
+                    <h3>리밸런싱 로그</h3>
+                    <div class="value" id="rebalancingCount">-</div>
+                    <p style="margin: 0.5rem 0 0 0; color: #666; font-size: 0.9rem;">리밸런싱 실행 횟수</p>
                 </div>
                 <div class="card">
-                    <h3>주식 평가액</h3>
-                    <div class="value" id="stockValue">-</div>
+                    <h3>포트폴리오 스냅샷</h3>
+                    <div class="value" id="snapshotCount">-</div>
+                    <p style="margin: 0.5rem 0 0 0; color: #666; font-size: 0.9rem;">포트폴리오 기록 수</p>
                 </div>
                 <div class="card">
-                    <h3>보유 종목 수</h3>
-                    <div class="value" id="positionCount">-</div>
+                    <h3>시스템 로그</h3>
+                    <div class="value" id="systemLogCount">-</div>
+                    <p style="margin: 0.5rem 0 0 0; color: #666; font-size: 0.9rem;">시스템 로그 수</p>
                 </div>
             </div>
             
-            <!-- 자산 비율 차트 -->
-            <div class="chart-container">
-                <h3 style="margin: 0 0 1rem 0;">자산 배분</h3>
-                <div class="chart-wrapper">
-                    <canvas id="assetChart"></canvas>
+            <!-- DB 서브탭 -->
+            <div class="tabs" style="margin-top: 2rem; font-size: 0.9rem;">
+                <button class="tab active" onclick="switchDbTab('trading-history')">
+                    💰 거래 기록
+                </button>
+                <button class="tab" onclick="switchDbTab('rebalancing-logs')">
+                    ⚖️ 리밸런싱 로그
+                </button>
+                <button class="tab" onclick="switchDbTab('portfolio-snapshots')">
+                    📊 포트폴리오 스냅샷
+                </button>
+                <button class="tab" onclick="switchDbTab('system-logs')">
+                    📋 시스템 로그
+                </button>
+            </div>
+            
+            <!-- DB 데이터 테이블들 -->
+            <div id="trading-history" class="tab-content active">
+                <div class="filter-section">
+                    <label>포트폴리오 ID:</label>
+                    <input type="text" id="trading-portfolio-filter" value="demo_portfolio" placeholder="포트폴리오 ID">
+                    <label>주문 유형:</label>
+                    <select id="trading-order-type-filter">
+                        <option value="">전체</option>
+                        <option value="buy">구매</option>
+                        <option value="sell">판매</option>
+                    </select>
+                    <label>상태:</label>
+                    <select id="trading-status-filter">
+                        <option value="">전체</option>
+                        <option value="completed">완료</option>
+                        <option value="failed">실패</option>
+                        <option value="pending">대기</option>
+                    </select>
+                    <button class="refresh-btn" onclick="applyTradingFilters()">필터 적용</button>
+                    <button class="refresh-btn" onclick="resetTradingFilters()" style="background-color: #6c757d; margin-left: 0.5rem;">리셋</button>
+                </div>
+                <div class="positions-table">
+                    <div class="table-header">
+                        <h3>거래 기록</h3>
+                    </div>
+                    <div id="tradingHistoryTable"></div>
+                    <div id="tradingPagination" class="pagination"></div>
                 </div>
             </div>
             
-            <!-- 보유 종목 테이블 -->
-            <div class="positions-table">
-                <div class="table-header">
-                    <h3>보유 종목</h3>
+            <div id="rebalancing-logs" class="tab-content">
+                <div class="filter-section">
+                    <label>포트폴리오 ID:</label>
+                    <input type="text" id="rebalancing-portfolio-filter" value="demo_portfolio" placeholder="포트폴리오 ID">
+                    <label>상태:</label>
+                    <select id="rebalancing-status-filter">
+                        <option value="">전체</option>
+                        <option value="success">성공</option>
+                        <option value="failed">실패</option>
+                        <option value="partial">부분 성공</option>
+                    </select>
+                    <button class="refresh-btn" onclick="applyRebalancingFilters()">필터 적용</button>
+                    <button class="refresh-btn" onclick="resetRebalancingFilters()" style="background-color: #6c757d; margin-left: 0.5rem;">리셋</button>
                 </div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>종목코드</th>
-                            <th>보유수량</th>
-                            <th>현재가</th>
-                            <th>평가금액</th>
-                            <th>비율</th>
-                        </tr>
-                    </thead>
-                    <tbody id="positionsTable">
-                    </tbody>
-                </table>
+                <div class="positions-table">
+                    <div class="table-header">
+                        <h3>리밸런싱 로그</h3>
+                    </div>
+                    <div id="rebalancingLogsTable"></div>
+                    <div id="rebalancingPagination" class="pagination"></div>
+                </div>
+            </div>
+            
+            <div id="portfolio-snapshots" class="tab-content">
+                <div class="filter-section">
+                    <label>포트폴리오 ID:</label>
+                    <input type="text" id="snapshots-portfolio-filter" value="demo_portfolio" placeholder="포트폴리오 ID">
+                    <button class="refresh-btn" onclick="applySnapshotsFilters()">필터 적용</button>
+                    <button class="refresh-btn" onclick="resetSnapshotsFilters()" style="background-color: #6c757d; margin-left: 0.5rem;">리셋</button>
+                </div>
+                <div class="positions-table">
+                    <div class="table-header">
+                        <h3>포트폴리오 스냅샷</h3>
+                    </div>
+                    <div id="portfolioSnapshotsTable"></div>
+                    <div id="snapshotsPagination" class="pagination"></div>
+                </div>
+            </div>
+            
+            <div id="system-logs" class="tab-content">
+                <div class="filter-section">
+                    <label>로그 레벨:</label>
+                    <select id="system-level-filter">
+                        <option value="">전체</option>
+                        <option value="INFO">INFO</option>
+                        <option value="WARNING">WARNING</option>
+                        <option value="ERROR">ERROR</option>
+                    </select>
+                    <label>모듈:</label>
+                    <input type="text" id="system-module-filter" placeholder="모듈명 (부분 검색)">
+                    <button class="refresh-btn" onclick="applySystemLogsFilters()">필터 적용</button>
+                    <button class="refresh-btn" onclick="resetSystemLogsFilters()" style="background-color: #6c757d; margin-left: 0.5rem;">리셋</button>
+                </div>
+                <div class="positions-table">
+                    <div class="table-header">
+                        <h3>시스템 로그</h3>
+                    </div>
+                    <div id="systemLogsTable"></div>
+                    <div id="systemLogsPagination" class="pagination"></div>
+                </div>
             </div>
         </div>
-        
-        <div class="last-update" id="lastUpdate"></div>
     </div>
 
     <script>
         let chart = null;
+        let currentDbTab = 'trading-history';
+        let dbPageData = {
+            'trading-history': { page: 0, limit: 20, filters: {} },
+            'rebalancing-logs': { page: 0, limit: 20, filters: {} },
+            'portfolio-snapshots': { page: 0, limit: 20, filters: {} },
+            'system-logs': { page: 0, limit: 20, filters: {} }
+        };
         
         // 페이지 로드 시 데이터 가져오기
         window.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM Content Loaded, initializing data...');
+            
+            // 먼저 DOM 요소들이 존재하는지 확인
+            const dbContainer = document.getElementById('database');
+            const tradingTable = document.getElementById('tradingHistoryTable');
+            
+            console.log('DOM elements check:', {
+                database: !!dbContainer,
+                tradingTable: !!tradingTable,
+                currentDbTab: currentDbTab
+            });
+            
             refreshData();
+            
+            // DB 데이터도 초기화 (DOM 요소가 존재할 때만)
+            if (dbContainer && tradingTable) {
+                loadDbSummary();
+                loadDbTabData(currentDbTab);
+            } else {
+                console.warn('Some DOM elements not found, delaying DB initialization');
+                // 약간의 지연 후 재시도
+                setTimeout(() => {
+                    console.log('Retrying DB initialization...');
+                    loadDbSummary();
+                    loadDbTabData(currentDbTab);
+                }, 100);
+            }
             
             // 자동 새로고침 (30초마다)
             setInterval(refreshData, 30000);
         });
+        
+        // 메인 탭 전환 함수
+        function switchTab(tabName) {
+            // 모든 탭과 탭 내용 비활성화
+            document.querySelectorAll('.tabs .tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            // 선택된 탭 활성화
+            event.target.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+            
+            // DB 탭이 선택되면 DB 데이터 로드
+            if (tabName === 'database') {
+                refreshDbData();
+            }
+        }
+        
+        // DB 서브탭 전환 함수
+        function switchDbTab(tabName) {
+            console.log('Switching to DB sub-tab:', tabName);
+            
+            // DB 탭 내의 모든 서브탭과 내용 비활성화
+            const dbContainer = document.getElementById('database');
+            if (!dbContainer) {
+                console.error('Database container not found');
+                return;
+            }
+            
+            dbContainer.querySelectorAll('.tabs .tab').forEach(tab => tab.classList.remove('active'));
+            dbContainer.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            // 선택된 서브탭 활성화
+            if (event && event.target) {
+                event.target.classList.add('active');
+            }
+            
+            const tabContent = document.getElementById(tabName);
+            if (tabContent) {
+                tabContent.classList.add('active');
+            } else {
+                console.error('Tab content not found:', tabName);
+                return;
+            }
+            
+            currentDbTab = tabName;
+            loadDbTabData(tabName);
+        }
+        
+        // DB 데이터 로드
+        function refreshDbData() {
+            loadDbSummary();
+            loadDbTabData(currentDbTab);
+        }
+        
+        // DB 요약 정보 로드
+        async function loadDbSummary() {
+            try {
+                const [trading, rebalancing, snapshots, systemLogs] = await Promise.all([
+                    fetch('/api/db/trading-history?limit=100&portfolio_id=demo_portfolio'),
+                    fetch('/api/db/rebalancing-logs?limit=100&portfolio_id=demo_portfolio'),
+                    fetch('/api/db/portfolio-snapshots?limit=100&portfolio_id=demo_portfolio'),
+                    fetch('/api/db/system-logs?limit=100')
+                ]);
+                
+                const tradingData = await trading.json();
+                const rebalancingData = await rebalancing.json();
+                const snapshotsData = await snapshots.json();
+                const systemLogsData = await systemLogs.json();
+                
+                document.getElementById('tradingCount').textContent = tradingData.data?.length || 0;
+                document.getElementById('rebalancingCount').textContent = rebalancingData.data?.length || 0;
+                document.getElementById('snapshotCount').textContent = snapshotsData.data?.length || 0;
+                document.getElementById('systemLogCount').textContent = systemLogsData.data?.length || 0;
+                
+            } catch (error) {
+                console.error('DB 요약 정보 로드 실패:', error);
+            }
+        }
+        
+        // DB 탭별 데이터 로드
+        async function loadDbTabData(tabName) {
+            const loadingElement = document.getElementById('db-loading');
+            
+            // Tab name to table ID mapping
+            const tableIdMap = {
+                'trading-history': 'tradingHistoryTable',
+                'rebalancing-logs': 'rebalancingLogsTable',
+                'portfolio-snapshots': 'portfolioSnapshotsTable',
+                'system-logs': 'systemLogsTable'
+            };
+            
+            const tableElementId = tableIdMap[tabName];
+            const tableElement = document.getElementById(tableElementId);
+            
+            // DOM 요소가 없는 경우 에러 방지
+            if (!tableElement) {
+                console.error(`Table element not found: ${tableElementId} for tab: ${tabName}`);
+                console.error('Available table IDs:', Object.keys(tableIdMap));
+                return;
+            }
+            
+            try {
+                loadingElement.style.display = 'block';
+                console.log('Loading DB data for tab:', tabName);
+                
+                const pageData = dbPageData[tabName];
+                const offset = pageData.page * pageData.limit;
+                
+                // URL 파라미터 구성
+                const params = new URLSearchParams({
+                    limit: pageData.limit,
+                    offset: offset,
+                    environment: '{{ env }}'
+                });
+                
+                // 기본 포트폴리오 ID 설정 (거래 기록, 리밸런싱, 스냅샷용)
+                if (tabName === 'trading-history' || tabName === 'rebalancing-logs' || tabName === 'portfolio-snapshots') {
+                    params.append('portfolio_id', 'demo_portfolio');
+                }
+                
+                // 필터 추가 (값이 있는 경우만)
+                Object.keys(pageData.filters).forEach(key => {
+                    if (pageData.filters[key] && pageData.filters[key].trim() !== '') {
+                        params.append(key, pageData.filters[key]);
+                    }
+                });
+                
+                console.log('API params:', params.toString());
+                
+                let response;
+                switch(tabName) {
+                    case 'trading-history':
+                        response = await fetch(`/api/db/trading-history?${params}`);
+                        break;
+                    case 'rebalancing-logs':
+                        response = await fetch(`/api/db/rebalancing-logs?${params}`);
+                        break;
+                    case 'portfolio-snapshots':
+                        response = await fetch(`/api/db/portfolio-snapshots?${params}`);
+                        break;
+                    case 'system-logs':
+                        response = await fetch(`/api/db/system-logs?${params}`);
+                        break;
+                }
+                
+                const data = await response.json();
+                console.log('API response for', tabName, ':', data);
+                
+                if (data.error) {
+                    console.error('API Error:', data.error);
+                    tableElement.innerHTML = `<div class="error">데이터 로드 실패: ${data.error}</div>`;
+                } else {
+                    console.log('Rendering', data.data?.length || 0, 'records for', tabName);
+                    renderDbTable(tabName, data.data, tableElement);
+                    renderPagination(tabName, data.data?.length === pageData.limit);
+                }
+                
+            } catch (error) {
+                console.error('Load error:', error);
+                tableElement.innerHTML = `<div class="error">데이터 로드 실패: ${error.message}<br>콘솔을 확인해주세요.</div>`;
+            } finally {
+                loadingElement.style.display = 'none';
+            }
+        }
+        
+        // DB 테이블 렌더링
+        function renderDbTable(tabName, data, tableElement) {
+            if (!data || data.length === 0) {
+                tableElement.innerHTML = '<div style="padding: 2rem; text-align: center; color: #666;">데이터가 없습니다.</div>';
+                return;
+            }
+            
+            let html = '<table>';
+            
+            switch(tabName) {
+                case 'trading-history':
+                    html += `
+                        <thead>
+                            <tr>
+                                <th>시간</th>
+                                <th>포트폴리오 ID</th>
+                                <th>종목</th>
+                                <th>주문 유형</th>
+                                <th>수량</th>
+                                <th>가격</th>
+                                <th>총액</th>
+                                <th>상태</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                    `;
+                    data.forEach(row => {
+                        html += `
+                            <tr>
+                                <td>${formatDateTime(row.timestamp)}</td>
+                                <td>${row.portfolio_id}</td>
+                                <td>${row.symbol}</td>
+                                <td class="${row.order_type === 'buy' ? 'positive' : ''}">${row.order_type}</td>
+                                <td class="amount">${formatNumber(row.quantity)}</td>
+                                <td class="amount">${formatNumber(row.price)}원</td>
+                                <td class="amount">${formatNumber(row.total_amount)}원</td>
+                                <td>${row.status}</td>
+                            </tr>
+                        `;
+                    });
+                    break;
+                    
+                case 'rebalancing-logs':
+                    html += `
+                        <thead>
+                            <tr>
+                                <th>시간</th>
+                                <th>포트폴리오 ID</th>
+                                <th>리밸런싱 사유</th>
+                                <th>실행 주문 수</th>
+                                <th>상태</th>
+                                <th>환경</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                    `;
+                    data.forEach(row => {
+                        html += `
+                            <tr>
+                                <td>${formatDateTime(row.timestamp)}</td>
+                                <td>${row.portfolio_id}</td>
+                                <td style="max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${row.rebalance_reason}">${row.rebalance_reason}</td>
+                                <td class="amount">${row.orders_executed}</td>
+                                <td class="${row.status === 'success' ? 'positive' : ''}">${row.status}</td>
+                                <td>${row.environment}</td>
+                            </tr>
+                        `;
+                    });
+                    break;
+                    
+                case 'portfolio-snapshots':
+                    html += `
+                        <thead>
+                            <tr>
+                                <th>시간</th>
+                                <th>포트폴리오 ID</th>
+                                <th>총 평가액</th>
+                                <th>포지션 수</th>
+                                <th>환경</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                    `;
+                    data.forEach(row => {
+                        const positionsCount = row.positions ? Object.keys(row.positions).length : 0;
+                        html += `
+                            <tr>
+                                <td>${formatDateTime(row.timestamp)}</td>
+                                <td>${row.portfolio_id}</td>
+                                <td class="amount">${formatNumber(row.total_value)}원</td>
+                                <td class="amount">${positionsCount}개</td>
+                                <td>${row.environment}</td>
+                            </tr>
+                        `;
+                    });
+                    break;
+                    
+                case 'system-logs':
+                    html += `
+                        <thead>
+                            <tr>
+                                <th>시간</th>
+                                <th>레벨</th>
+                                <th>모듈</th>
+                                <th>메시지</th>
+                                <th>환경</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                    `;
+                    data.forEach(row => {
+                        html += `
+                            <tr>
+                                <td>${formatDateTime(row.timestamp)}</td>
+                                <td class="${row.level === 'ERROR' ? 'error' : row.level === 'WARNING' ? 'percentage' : ''}">${row.level}</td>
+                                <td>${row.module}</td>
+                                <td style="max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${row.message}">${row.message}</td>
+                                <td>${row.environment}</td>
+                            </tr>
+                        `;
+                    });
+                    break;
+            }
+            
+            html += '</tbody></table>';
+            tableElement.innerHTML = html;
+        }
+        
+        // 날짜/시간 포매팅
+        function formatDateTime(timestamp) {
+            return new Date(timestamp).toLocaleString('ko-KR', {
+                year: '2-digit',
+                month: '2-digit', 
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        
+        // 필터 적용 함수들
+        function applyTradingFilters() {
+            const portfolioId = document.getElementById('trading-portfolio-filter').value.trim();
+            const orderType = document.getElementById('trading-order-type-filter').value.trim();
+            const status = document.getElementById('trading-status-filter').value.trim();
+            
+            const filters = {};
+            if (portfolioId) filters.portfolio_id = portfolioId;
+            if (orderType) filters.order_type = orderType;
+            if (status) filters.status = status;
+            
+            console.log('Applying trading filters:', filters);
+            
+            dbPageData['trading-history'].filters = filters;
+            dbPageData['trading-history'].page = 0;
+            loadDbTabData('trading-history');
+        }
+        
+        function applyRebalancingFilters() {
+            const portfolioId = document.getElementById('rebalancing-portfolio-filter').value.trim();
+            const status = document.getElementById('rebalancing-status-filter').value.trim();
+            
+            const filters = {};
+            if (portfolioId) filters.portfolio_id = portfolioId;
+            if (status) filters.status = status;
+            
+            console.log('Applying rebalancing filters:', filters);
+            
+            dbPageData['rebalancing-logs'].filters = filters;
+            dbPageData['rebalancing-logs'].page = 0;
+            loadDbTabData('rebalancing-logs');
+        }
+        
+        function applySnapshotsFilters() {
+            const portfolioId = document.getElementById('snapshots-portfolio-filter').value.trim();
+            
+            const filters = {};
+            if (portfolioId) filters.portfolio_id = portfolioId;
+            
+            console.log('Applying snapshots filters:', filters);
+            
+            dbPageData['portfolio-snapshots'].filters = filters;
+            dbPageData['portfolio-snapshots'].page = 0;
+            loadDbTabData('portfolio-snapshots');
+        }
+        
+        function applySystemLogsFilters() {
+            const level = document.getElementById('system-level-filter').value.trim();
+            const module = document.getElementById('system-module-filter').value.trim();
+            
+            const filters = {};
+            if (level) filters.level = level;
+            if (module) filters.module = module;
+            
+            console.log('Applying system logs filters:', filters);
+            
+            dbPageData['system-logs'].filters = filters;
+            dbPageData['system-logs'].page = 0;
+            loadDbTabData('system-logs');
+        }
+        
+        // 필터 초기화 함수들
+        function resetTradingFilters() {
+            document.getElementById('trading-portfolio-filter').value = 'demo_portfolio';
+            document.getElementById('trading-order-type-filter').value = '';
+            document.getElementById('trading-status-filter').value = '';
+            applyTradingFilters();
+        }
+        
+        function resetRebalancingFilters() {
+            document.getElementById('rebalancing-portfolio-filter').value = 'demo_portfolio';
+            document.getElementById('rebalancing-status-filter').value = '';
+            applyRebalancingFilters();
+        }
+        
+        function resetSnapshotsFilters() {
+            document.getElementById('snapshots-portfolio-filter').value = 'demo_portfolio';
+            applySnapshotsFilters();
+        }
+        
+        function resetSystemLogsFilters() {
+            document.getElementById('system-level-filter').value = '';
+            document.getElementById('system-module-filter').value = '';
+            applySystemLogsFilters();
+        }
+        
+        // 페이지네이션 함수
+        function changePage(tabName, direction) {
+            const pageData = dbPageData[tabName];
+            if (direction === 'prev' && pageData.page > 0) {
+                pageData.page--;
+            } else if (direction === 'next') {
+                pageData.page++;
+            }
+            loadDbTabData(tabName);
+        }
+        
+        // 페이지네이션 렌더링  
+        function renderPagination(tabName, hasMore) {
+            // Tab name to pagination ID mapping
+            const paginationIdMap = {
+                'trading-history': 'tradingPagination',
+                'rebalancing-logs': 'rebalancingPagination',
+                'portfolio-snapshots': 'snapshotsPagination',
+                'system-logs': 'systemLogsPagination'
+            };
+            
+            const paginationElementId = paginationIdMap[tabName];
+            const paginationElement = document.getElementById(paginationElementId);
+            
+            // DOM 요소가 없는 경우 에러 방지
+            if (!paginationElement) {
+                console.error(`Pagination element not found: ${paginationElementId} for tab: ${tabName}`);
+                console.error('Available pagination IDs:', Object.keys(paginationIdMap));
+                return;
+            }
+            
+            const pageData = dbPageData[tabName];
+            
+            let html = '';
+            
+            if (pageData.page > 0 || hasMore) {
+                html += `
+                    <button onclick="changePage('${tabName}', 'prev')" 
+                            ${pageData.page === 0 ? 'disabled' : ''}>
+                        이전
+                    </button>
+                    <span class="current-page">
+                        페이지 ${pageData.page + 1}
+                    </span>
+                    <button onclick="changePage('${tabName}', 'next')" 
+                            ${!hasMore ? 'disabled' : ''}>
+                        다음
+                    </button>
+                `;
+            }
+            
+            paginationElement.innerHTML = html;
+        }
         
         async function refreshData() {
             try {

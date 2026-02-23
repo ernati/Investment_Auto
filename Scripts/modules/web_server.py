@@ -9,13 +9,14 @@ import threading
 import time
 from datetime import datetime
 from typing import Dict, List, Optional
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 import json
 from pathlib import Path
 
 from .config_loader import get_config
 from .kis_auth import KISAuth
 from .kis_portfolio_fetcher import KISPortfolioFetcher
+from .db_manager import DatabaseManager
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +62,14 @@ class PortfolioWebServer:
             self.kis_auth = None
             self.portfolio_fetcher = None
         
+        # DB 매니저 초기화
+        try:
+            self.db_manager = DatabaseManager()
+            logger.info("Database manager initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize database manager: {e}")
+            self.db_manager = None
+        
         # 라우트 설정
         self._setup_routes()
         
@@ -94,8 +103,108 @@ class PortfolioWebServer:
                 'status': 'healthy',
                 'timestamp': datetime.now().isoformat(),
                 'environment': self.env,
-                'api_status': 'connected' if self.kis_auth else 'disconnected'
+                'api_status': 'connected' if self.kis_auth else 'disconnected',
+                'db_status': 'connected' if self.db_manager else 'disconnected'
             })
+        
+        @self.app.route('/api/db/trading-history')
+        def get_trading_history_api():
+            """거래 기록 조회 API"""
+            try:
+                portfolio_id = request.args.get('portfolio_id', 'default')
+                environment = request.args.get('environment', self.env)
+                limit = int(request.args.get('limit', 50))
+                offset = int(request.args.get('offset', 0))
+                
+                if not self.db_manager:
+                    return jsonify({'error': 'Database not available'}), 500
+                
+                data = self.db_manager.get_trading_history(
+                    portfolio_id, environment, limit, offset
+                )
+                return jsonify({
+                    'data': data,
+                    'total': len(data),
+                    'limit': limit,
+                    'offset': offset
+                })
+            except Exception as e:
+                logger.error(f"Trading history API error: {e}")
+                return jsonify({'error': str(e)}), 500
+        
+        @self.app.route('/api/db/rebalancing-logs')
+        def get_rebalancing_logs_api():
+            """리밸런싱 로그 조회 API"""
+            try:
+                portfolio_id = request.args.get('portfolio_id', 'default')
+                environment = request.args.get('environment', self.env)
+                limit = int(request.args.get('limit', 30))
+                offset = int(request.args.get('offset', 0))
+                
+                if not self.db_manager:
+                    return jsonify({'error': 'Database not available'}), 500
+                
+                data = self.db_manager.get_rebalancing_logs(
+                    portfolio_id, environment, limit, offset
+                )
+                return jsonify({
+                    'data': data,
+                    'total': len(data),
+                    'limit': limit,
+                    'offset': offset
+                })
+            except Exception as e:
+                logger.error(f"Rebalancing logs API error: {e}")
+                return jsonify({'error': str(e)}), 500
+        
+        @self.app.route('/api/db/portfolio-snapshots')
+        def get_portfolio_snapshots_api():
+            """포트폴리오 스냅샷 조회 API"""
+            try:
+                portfolio_id = request.args.get('portfolio_id', 'default')
+                environment = request.args.get('environment', self.env)
+                limit = int(request.args.get('limit', 30))
+                offset = int(request.args.get('offset', 0))
+                
+                if not self.db_manager:
+                    return jsonify({'error': 'Database not available'}), 500
+                
+                data = self.db_manager.get_portfolio_snapshots(
+                    portfolio_id, environment, limit, offset
+                )
+                return jsonify({
+                    'data': data,
+                    'total': len(data),
+                    'limit': limit,
+                    'offset': offset
+                })
+            except Exception as e:
+                logger.error(f"Portfolio snapshots API error: {e}")
+                return jsonify({'error': str(e)}), 500
+        
+        @self.app.route('/api/db/system-logs')
+        def get_system_logs_api():
+            """시스템 로그 조회 API"""
+            try:
+                level = request.args.get('level', '')
+                module = request.args.get('module', '')
+                environment = request.args.get('environment', self.env)
+                limit = int(request.args.get('limit', 50))
+                offset = int(request.args.get('offset', 0))
+                
+                if not self.db_manager:
+                    return jsonify({'error': 'Database not available'}), 500
+                
+                data = self.get_system_logs(level, module, environment, limit, offset)
+                return jsonify({
+                    'data': data,
+                    'total': len(data),
+                    'limit': limit,
+                    'offset': offset
+                })
+            except Exception as e:
+                logger.error(f"System logs API error: {e}")
+                return jsonify({'error': str(e)}), 500
     
     def get_portfolio_data(self) -> Dict:
         """포트폴리오 데이터 조회 (캐시 적용)"""
@@ -218,3 +327,58 @@ class PortfolioWebServer:
     def is_running(self) -> bool:
         """서버 실행 상태 확인"""
         return self.running and self.server_thread and self.server_thread.is_alive()
+    
+    def get_system_logs(self, level: str = '', module: str = '', environment: str = '', 
+                       limit: int = 50, offset: int = 0) -> List[Dict]:
+        """
+        시스템 로그 조회 (필터링 지원)
+        
+        Args:
+            level: 로그 레벨 필터
+            module: 모듈 필터  
+            environment: 환경 필터
+            limit: 조회 제한 수
+            offset: 오프셋
+            
+        Returns:
+            시스템 로그 리스트
+        """
+        if not self.db_manager:
+            return []
+        
+        try:
+            with self.db_manager.get_connection() as conn:
+                from psycopg2.extras import RealDictCursor
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    where_clauses = []
+                    params = []
+                    
+                    if environment:
+                        where_clauses.append("environment = %s")
+                        params.append(environment)
+                    
+                    if level:
+                        where_clauses.append("level = %s")
+                        params.append(level)
+                    
+                    if module:
+                        where_clauses.append("module ILIKE %s")
+                        params.append(f"%{module}%")
+                    
+                    where_sql = " WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+                    
+                    query = f"""
+                        SELECT * FROM system_logs
+                        {where_sql}
+                        ORDER BY timestamp DESC
+                        LIMIT %s OFFSET %s
+                    """
+                    
+                    params.extend([limit, offset])
+                    cur.execute(query, params)
+                    
+                    return [dict(record) for record in cur.fetchall()]
+                    
+        except Exception as e:
+            logger.error(f"Failed to get system logs: {e}")
+            return []
