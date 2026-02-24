@@ -1,0 +1,35 @@
+{
+  "initial_cash": 10000000,
+  "current_cash": 2224000,
+  "total_invested": 7776000.0,
+  "holdings": {
+    "005930": {
+      "quantity": 40,
+      "avg_price": 194400.0,
+      "last_updated": "20260224_220436"
+    }
+  },
+  "trade_history": [
+    {
+      "timestamp": "20260224_220407",
+      "ticker": "005930",
+      "side": "buy",
+      "quantity": 20,
+      "price": 194400,
+      "amount": 3888000,
+      "cash_before": 10000000,
+      "cash_after": 6112000
+    },
+    {
+      "timestamp": "20260224_220436",
+      "ticker": "005930",
+      "side": "buy",
+      "quantity": 20,
+      "price": 194400,
+      "amount": 3888000,
+      "cash_before": 6112000,
+      "cash_after": 2224000
+    }
+  ],
+  "last_updated": "2026-02-24T22:04:36.164809"
+}

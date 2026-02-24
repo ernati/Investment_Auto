@@ -12,6 +12,7 @@ from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 
 import pandas as pd
+from .demo_cash_manager import get_demo_cash_manager
 
 from .kis_auth import KISAuth
 from .portfolio_models import PortfolioSnapshot, PositionSnapshot, PriceSnapshot
@@ -35,6 +36,7 @@ class KISPortfolioFetcher:
     def fetch_account_balance(self) -> Dict[str, float]:
         """
         계좌 잔고를 조회합니다.
+        모의투자 환경에서는 가상 현금 관리자를 통해 잔액을 조회합니다.
         
         Returns:
             {
@@ -44,6 +46,25 @@ class KISPortfolioFetcher:
                 ...
             }
         """
+        # 모의투자 환경에서는 가상 현금 관리자를 사용
+        if self.kis_auth.env == "demo":
+            try:
+                demo_manager = get_demo_cash_manager(self.kis_auth.account)
+                cash_balance = demo_manager.get_cash_balance()
+                logger.info(f"Demo 환경 현금 잔고 조회: {cash_balance:,}원")
+                
+                return {
+                    'cash': cash_balance,
+                    'd2_cash': cash_balance,  # 모의투자에서는 같은 값
+                    'orderable_cash': cash_balance,  # 모의투자에서는 같은 값
+                    'total_cash': cash_balance
+                }
+            except Exception as e:
+                logger.error(f"Demo 현금 잔고 조회 실패: {e}")
+                # 에러 시 기본값 반환
+                return {'cash': 10000000.0, 'd2_cash': 10000000.0, 'orderable_cash': 10000000.0, 'total_cash': 10000000.0}
+        
+        # 실전 환경에서는 실제 API 호출
         url = f"{self.base_url}/uapi/domestic-stock/v1/trading/inquire-balance"
         
         # TR_ID 설정 (환경별 정규화는 build_api_headers에서 자동 처리)

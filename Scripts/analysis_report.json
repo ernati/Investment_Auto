@@ -1,0 +1,68 @@
+{
+  "summary": {
+    "total_trades": 2,
+    "total_invested": 7776000.0,
+    "cash_utilization": 77.76,
+    "holdings_count": 1,
+    "avg_trade_size": 3888000.0
+  },
+  "holdings": {
+    "005930": {
+      "quantity": 40,
+      "avg_price": 194400.0,
+      "invested_amount": 7776000.0,
+      "weight": 100.0
+    }
+  },
+  "hourly_pattern": {
+    "22": {
+      "count": 2,
+      "amount": 7776000
+    }
+  },
+  "cash_flow": {
+    "initial": 10000000,
+    "final": 2224000,
+    "total_spent": 7776000.0,
+    "calculated_remaining": 2224000.0,
+    "actual_remaining": 2224000,
+    "discrepancy": 0.0,
+    "detailed_tracking": [
+      {
+        "timestamp": "20260224_220407",
+        "ticker": "005930",
+        "amount": 3888000,
+        "expected_cash": 6112000,
+        "actual_cash": 6112000,
+        "difference": 0
+      },
+      {
+        "timestamp": "20260224_220436",
+        "ticker": "005930",
+        "amount": 3888000,
+        "expected_cash": 2224000,
+        "actual_cash": 2224000,
+        "difference": 0
+      }
+    ]
+  },
+  "kis_issues": {
+    "original_balance": 10000000,
+    "reported_balance": 9500000,
+    "actual_balance": 2224000,
+    "total_trades": 2,
+    "total_amount_traded": 7776000.0,
+    "identified_issues": [
+      {
+        "issue": "현금 차감 부정확",
+        "description": "매수 후에도 현금이 제대로 차감되지 않음",
+        "impact": "실제보다 7,276,000원 과다 표시"
+      },
+      {
+        "issue": "이중 매수 위험",
+        "description": "과도한 현금 잔액으로 인한 오버트레이딩 가능성",
+        "risk_level": "높음"
+      }
+    ]
+  }
+}

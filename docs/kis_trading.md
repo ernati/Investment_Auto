@@ -2,11 +2,24 @@
 
 ## 개요
 `kis_trading.py`는 한국투자증권 Open Trading API를 사용하여 주식 매매(매수/매도) 기능을 제공하는 모듈입니다.
-실전투자와 모의투자를 자동으로 구분하여 적절한 TR ID를 사용합니다.
+실전투자와 모의투자를 자동으로 구분하여 적절한 TR ID를 사용하며, 모의투자 환경에서는 안전한 가상 현금 관리 기능이 통합되어 있습니다.
 
 ## 파일 위치
 - **경로**: `Investment_Auto/Scripts/modules/kis_trading.py`
 - **유형**: 모듈 (Module)
+
+## 주요 특징 (v2.1.0)
+
+### 🏛️ 안전한 체결가 관리 시스템
+- **실제 체결가 우선**: API 응답에서 실제 체결 정보 추출
+- **현재가 API 백업**: 체결가 미확인 시 실시간 현재가 조회  
+- **확인 불가 시 보류**: 모든 방법 실패 시 현금 업데이트 중단
+- **예상가 사용 금지**: 부정확한 추정가 사용 완전 제거
+
+### 🎯 모의투자 현금 관리
+- **자동 현금 업데이트**: 주문 성공 시 자동으로 가상 현금 차감/증가
+- **정확한 금액 반영**: 실제/현재가 기반 정확한 계산
+- **안전 장치**: 현금 부족 시 매수 차단
 
 ## 주요 기능
 
@@ -342,6 +355,158 @@ print(f"매도 결과: {sell_result}")
 
 ## API 엔드포인트
 - **URL**: `/uapi/domestic-stock/v1/trading/order-cash`
+
+---
+
+## ⚠️ 중요 업데이트 (v2.1.0 - 2026.02.24)
+
+### 🏛️ 안전한 체결가 확인 시스템 도입
+
+기존 **예상 체결가 사용 방식의 문제점**을 해결하고, **일반적인 거래 시스템 표준**에 맞춘 안전한 체결가 확인 시스템을 도입했습니다.
+
+### ❌ 이전 방식의 문제점
+```python
+# v2.0.0 - 부정확한 예상 체결가 사용
+estimated_prices = {
+    "005930": 75000.0,   # 고정된 추정가 (실제와 다를 수 있음)
+    "000660": 130000.0,  # 시세 변동 미반영
+}
+executed_price = estimated_prices.get(stock_code, 50000.0)  # 부정확!!
+```
+
+**문제점:**
+- 실제 체결가와 달라 현금 잔액 부정확
+- 시세 변동 미반영으로 모의투자 경험 왜곡
+- 일반적인 거래 시스템과 다른 방식
+
+### ✅ 현재 방식의 개선 사항
+```python
+# v2.1.0 - 안전한 체결가 확인 시스템
+def _get_execution_price(self, api_output, stock_code, price, order_division):
+    # 1. 지정가 주문: 입력된 가격 사용
+    if price != "0" and order_division == "00":
+        return float(price)  # 정확한 지정가
+    
+    # 2. API 응답에서 실제 체결가 추출 시도
+    executed_price = self._extract_executed_price_from_response(api_output)
+    if executed_price is not None:
+        return executed_price  # 실제 체결가
+    
+    # 3. 현재가 API로 실시간 가격 조회
+    current_price = self._get_current_market_price(stock_code)
+    if current_price is not None:
+        return current_price  # 실시간 현재가
+    
+    # 4. 모든 방법 실패 시 현금 업데이트 안함
+    return None  # 안전한 처리
+```
+
+### 📊 체결가 확인 순서
+
+| 순서 | 방법 | 설명 | 정확성 |
+|------|------|------|--------|
+| 1 | **지정가 주문** | 입력된 가격 사용 | ⭐⭐⭐ 최고 |
+| 2 | **API 응답** | 실제 체결가 추출 | ⭐⭐⭐ 최고 |
+| 3 | **현재가 API** | 실시간 시세 조회 | ⭐⭐ 높음 |
+| 4 | **확인 불가** | 현금 업데이트 보류 | ⭐⭐⭐ 안전 |
+
+### 🔍 API 응답 체결가 추출
+
+**확인하는 필드들:**
+```python
+price_fields = [
+    'avg_prvs',      # 평균단가
+    'tot_ccld_amt',  # 총체결금액  
+    'ccld_unpr',     # 체결단가
+    'avg_unpr',      # 평균단가
+    'ord_unpr'       # 주문단가
+]
+```
+
+### 📱 현재가 API 백업 조회
+
+**kis_api_client 활용:**
+```python
+from .kis_api_client import KISAPIClient
+
+api_client = KISAPIClient(self.auth)
+market_info = api_client.get_market_price(stock_code)
+
+if market_info and '현재가' in market_info:
+    current_price = float(market_info['현재가'].replace(',', ''))
+    return current_price  # 실시간 현재가 사용
+```
+
+### 🛡️ 체결가 확인 불가 시 안전 처리
+
+**일반적인 거래 시스템과 동일한 방식:**
+```python
+if executed_price is None:
+    # 체결가를 전혀 확인할 수 없는 경우
+    logger.warning(f"Demo 체결가 확인 불가 - 현금 업데이트 보류: {stock_code}")
+    logger.info("체결 확인 후 수동으로 현금 업데이트를 진행하세요.")
+    # ✅ 주문은 성공하지만 현금 업데이트는 보류 (안전)
+else:
+    # ✅ 체결가 확인된 경우만 정확한 금액으로 현금 업데이트
+    demo_manager.buy_stock(stock_code, quantity, executed_price)
+```
+
+### 📝 향상된 로깅 시스템
+
+**정상 동작 로그:**
+```
+INFO - 지정가 주문 체결가: 75,000원
+INFO - Demo 매수 현금 차감: 005930 10주 x 75,000원 = 750,000원
+
+INFO - API 응답에서 체결가 확인: 74,800원  
+INFO - Demo 매수 현금 차감: 005930 10주 x 74,800원 = 748,000원
+
+INFO - 현재가 API로 체결가 확인: 74,900원
+```
+
+**체결가 확인 실패 로그:**
+```
+WARNING - Demo 체결가 확인 불가 - 현금 업데이트 보류: 005930
+INFO - 체결 확인 후 수동으로 현금 업데이트를 진행하세요.
+```
+
+### 🎯 사용자 경험 개선
+
+**이전:**
+- 부정확한 예상가로 현금 차감/증가
+- 실제 거래와 다른 경험
+- 시세 변동 미반영
+
+**현재:**
+- 실제 체결가/현재가 기반 정확한 현금 관리
+- 실제 거래 시스템과 동일한 경험
+- 체결가 확인 불가 시 안전한 보류 처리
+
+### 💡 사용 권장사항
+
+1. **지정가 주문 우선 사용**
+   ```python
+   # 정확한 가격으로 거래
+   result = trading.buy_limit_order("005930", 10, 75000)
+   ```
+
+2. **시장가 주문 시 로그 확인**
+   ```python
+   # 실제 체결가 확인
+   result = trading.buy_market_order("005930", 10)
+   # 로그에서 "체결가 확인: XX원" 메시지 확인
+   ```
+
+3. **체결가 미확인 시 수동 처리**
+   ```python
+   # 주문 성공하지만 현금 업데이트 보류된 경우
+   from modules.demo_cash_manager import get_demo_cash_manager
+   
+   manager = get_demo_cash_manager(account)
+   manager.buy_stock("005930", 10, 74500)  # 수동으로 실제 체결가 입력
+   ```
+
+이제 **일반적인 거래 시스템과 동일한 방식**으로 안전하고 정확한 현금 관리를 제공합니다! 🚀
 - **Method**: POST
 - **인증**: Bearer Token 필요
 
