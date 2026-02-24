@@ -1,0 +1,102 @@
+# 설정 파일 (민감한 정보 포함)
+Config/
+config.json
+
+# 로그 파일
+log/
+logs/
+*.log
+
+# 데모 데이터 (로컬 환경에 따라 변경되는 데이터)
+demo_data/
+Scripts/modules/demo_data/
+
+# 임시 파일
+temp/
+Scripts/temp/
+tmp/
+
+# Python 관련 파일
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# 가상환경
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE 관련 파일
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 운영체제 관련 파일
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 백업 파일
+*.bak
+*.backup
+*.old
+
+# 테스트 커버리지
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# 환경 변수 파일
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 개인 설정 파일
+personal_config.py
+my_config.py
