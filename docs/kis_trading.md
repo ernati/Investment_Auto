@@ -498,6 +498,69 @@ INFO - 체결 확인 후 수동으로 현금 업데이트를 진행하세요.
    ```
 
 3. **체결가 미확인 시 수동 처리**
+
+---
+
+## ⚠️ 긴급 버그 수정 (2026.02.26)
+
+### 🐛 build_api_headers 함수 호출 오류 해결
+
+**문제 상황:**
+```
+ERROR - API 호출 중 예외: /uapi/domestic-stock/v1/trading/order-cash - build_api_headers() got an unexpected keyword argument 'auth_context'
+```
+
+**원인:**
+- `build_api_headers` 함수를 호출할 때 잘못된 키워드 인자 사용
+- `kis_api_utils.py`의 함수 시그니처와 `kis_trading.py`의 호출 방식이 불일치
+
+**수정 이전 (오류 코드):**
+```python
+headers = build_api_headers(
+    auth_context=self.auth,  # ❌ 존재하지 않는 매개변수
+    tr_id=tr_id
+)
+```
+
+**수정 이후 (정상 코드):**
+```python
+headers = build_api_headers(
+    self.auth,  # ✅ 올바른 위치 인자
+    tr_id
+)
+```
+
+**kis_api_utils.py의 실제 함수 시그니처:**
+```python
+def build_api_headers(
+    kis_auth: KISAuth,  # 첫 번째 매개변수
+    tr_id: str,
+    tr_cont: str = ""
+) -> Dict[str, str]:
+```
+
+### 📍 수정 위치
+- **파일**: `Investment_Auto/Scripts/modules/kis_trading.py`
+- **라인**: 403-407  
+- **함수**: `_make_api_call` 메서드 내부
+
+### 🔍 발견 과정
+1. **에러 로그 분석**: `auth_context` 매개변수 오류 확인
+2. **함수 시그니처 확인**: `kis_api_utils.py`에서 실제 매개변수명 확인  
+3. **호출 지점 비교**: 43번 줄(정상)과 403번 줄(오류) 비교
+4. **일관성 수정**: 위치 인자로 통일
+
+### 🚀 수정 효과
+- **주문 실행 정상화**: 모든 거래 기능이 정상 작동
+- **데모 투자 재개**: 리밸런싱 및 자동 거래 시스템 정상화
+- **일관성 개선**: 모든 `build_api_headers` 호출이 동일한 방식으로 통일
+
+### 💡 예방 조치
+1. **함수 시그니처 확인**: 다른 모듈 함수 호출 시 매개변수명 확인
+2. **테스트 강화**: `kis_debug.py`에서 API 호출 테스트 추가
+3. **코드 리뷰**: 유사한 패턴의 함수 호출 일관성 검사
+
+**관련 에러코드 참조**: https://apiportal.koreainvestment.com/faq-error-code
    ```python
    # 주문 성공하지만 현금 업데이트 보류된 경우
    from modules.demo_cash_manager import get_demo_cash_manager

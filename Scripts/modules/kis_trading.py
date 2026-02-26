@@ -401,8 +401,8 @@ class KISTrading:
         try:
             # 인증 헤더 생성
             headers = build_api_headers(
-                auth_context=self.auth,
-                tr_id=tr_id
+                self.auth,
+                tr_id
             )
             
             # API 호출
