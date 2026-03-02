@@ -409,14 +409,14 @@ class KISTrading:
             if method.upper() == 'GET':
                 response = execute_api_request_with_retry(
                     method='GET',
-                    url=self.auth.api_base_url + endpoint,
+                    url=self.auth.base_url + endpoint,
                     headers=headers,
                     params=params  # GET 요청에서는 params 사용
                 )
             else:  # POST
                 response = execute_api_request_with_retry(
                     method='POST',
-                    url=self.auth.api_base_url + endpoint,
+                    url=self.auth.base_url + endpoint,
                     headers=headers,
                     json=params
                 )
