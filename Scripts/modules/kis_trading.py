@@ -385,53 +385,6 @@ class KISTrading:
         logger.warning(f"체결정보 3번 재시도 모두 실패: {order_no}")
         return None
     
-    def _call_api(self, endpoint: str, tr_id: str, params: Dict[str, str], method: str = 'POST') -> Dict[str, Any]:
-        """
-        KIS API 공통 호출 함수.
-        
-        Args:
-            endpoint (str): API 엔드포인트
-            tr_id (str): TR ID
-            params (dict): 요청 파라미터
-            method (str): HTTP 메소드 ('GET' 또는 'POST')
-            
-        Returns:
-            dict: API 응답 데이터
-        """
-        try:
-            # 인증 헤더 생성
-            headers = build_api_headers(
-                self.auth,
-                tr_id
-            )
-            
-            # API 호출
-            if method.upper() == 'GET':
-                response = execute_api_request_with_retry(
-                    method='GET',
-                    url=self.auth.base_url + endpoint,
-                    headers=headers,
-                    params=params  # GET 요청에서는 params 사용
-                )
-            else:  # POST
-                response = execute_api_request_with_retry(
-                    method='POST',
-                    url=self.auth.base_url + endpoint,
-                    headers=headers,
-                    json=params
-                )
-            
-            # 응답 체크
-            if not response:
-                logger.error(f"API 호출 실패: {endpoint} - 빈 응답")
-                return {'rt_cd': 'ERROR', 'msg1': '빈 응답'}
-            
-            return response
-            
-        except Exception as e:
-            logger.error(f"API 호출 중 예외: {endpoint} - {e}")
-            return {'rt_cd': 'ERROR', 'msg1': str(e)}
-    
     def _get_current_market_price(self, stock_code: str) -> Optional[float]:
         """
         현재 시장가격을 조회합니다.
