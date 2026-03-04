@@ -320,23 +320,25 @@ class KISTrading:
                 # TR ID 설정 (demo 환경)
                 tr_id = "VTTC8001R"  # 모의투자 주식일별주문체결조회
                 
-                # 요청 파라미터
+                # 요청 파라미터 - open-trading-api 참조
                 params = {
-                    "CANO": self.auth.account[:8],  # 종합계좌번호 (8자리)
+                    "CANO": self.auth.account,  # 종합계좌번호 (8자리)
                     "ACNT_PRDT_CD": self.auth.product,  # 계좌상품코드
                     "INQR_STRT_DT": today,  # 조회시작일자
                     "INQR_END_DT": today,   # 조회종료일자
                     "SLL_BUY_DVSN_CD": "00",  # 매도매수구분코드 (00:전체)
                     "INQR_DVSN": "00",  # 조회구분 (00:역순, 01:정순)
-                    "PDNO": stock_code,  # 상품번호 (종목코드)
+                    "PDNO": "",  # 상품번호 - 전체 조회를 위해 빈 값
                     "CCLD_DVSN": "01",  # 체결구분 (01:체결만)
                     "INQR_DVSN_3": "01",  # 조회구분3 (01:현금)
-                    "ORD_GNO_BRNO": "",  # 주문채번지점번호
-                    "ODNO": order_no,  # 주문번호
-                    "INQR_DVSN_1": "",  # 조회구분1
-                    "FK100": "",  # 연속조회검색조건100
-                    "NK100": "",  # 연속조회키100
-                    "EXCG_ID_DVSN_CD": "KRX"  # 거래소ID구분코드
+                    "ORD_GNO_BRNO": "",  # 주문채번지점번호 - 빈 값
+                    "ODNO": "",  # 주문번호 - 빈 값 (전체 조회)
+                    "INQR_DVSN_1": "",  # 조회구분1 - 빈 값 
+                    "CTX_AREA_FK100": "",  # 연속조회검색조건100 - 빈 값으로 시작
+                    "CTX_AREA_NK100": "",  # 연속조회키100 - 빈 값으로 시작
+                    # "FK100": "",  # 이전 파라미터명 제거
+                    # "NK100": "",  # 이전 파라미터명 제거
+                    # "EXCG_ID_DVSN_CD": "KRX"  # 불필요한 파라미터 제거
                 }
                 
                 # API 호출
@@ -346,13 +348,17 @@ class KISTrading:
                     # 성공 시 output1에서 체결정보 추출
                     output1_list = response.get('output1', [])
                     
+                    # 해당 주문번호에 해당하는 체결정보 찾기
                     for order_data in output1_list:
-                        # 주문번호 치합 확인
-                        if order_data.get('odno', '') == order_no:
+                        # 주문번호와 종목코드가 모두 일치하는 경우만 처리
+                        order_odno = order_data.get('odno', '')
+                        order_pdno = order_data.get('pdno', '')
+                        
+                        if order_odno == order_no and order_pdno == stock_code:
                             # 체결가격 추출 시도
                             price_fields = [
                                 'avg_prvs',       # 평균가 (체결가격)
-                                'tot_ccld_amt',   # 총체결금액  
+                                'ccld_unpr',      # 체결단가
                                 'ord_unpr'        # 주문단가
                             ]
                             
@@ -361,19 +367,38 @@ class KISTrading:
                                     try:
                                         price_value = float(order_data[field])
                                         if price_value > 0:
-                                            logger.info(f"체결정보 재조회 성공: {field} = {price_value:,}원")
+                                            logger.info(f"체결정보 재조회 성공: {field} = {price_value:,}원 (주문번호: {order_no}, 종목: {stock_code})")
                                             return price_value
                                     except (ValueError, TypeError):
                                         continue
                             
                             # 체결가격이 없으면 로그 출력 후 다음 시도
-                            logger.warning(f"체결정보에서 가격 미발견: {order_no} - 시도 {attempt + 1}")
+                            logger.warning(f"체결정보에서 가격 미발견: 주문번호={order_no}, 종목={stock_code} - 시도 {attempt + 1}")
                             break
                     else:
-                        logger.warning(f"주문번호와 일치하는 체결정보 없음: {order_no} - 시도 {attempt + 1}")
+                        # 일치하는 주문을 찾지 못한 경우
+                        if output1_list:
+                            logger.warning(f"주문번호 {order_no} (종목: {stock_code})와 일치하는 체결정보 없음 - 시도 {attempt + 1}")
+                            # 디버깅을 위해 첫 번째 시도에서 조회된 주문들 일부 로그
+                            if attempt == 0 and len(output1_list) > 0:
+                                sample_orders = output1_list[:3]  # 최대 3개만 로그
+                                for i, sample in enumerate(sample_orders):
+                                    sample_odno = sample.get('odno', '')
+                                    sample_pdno = sample.get('pdno', '')
+                                    logger.debug(f"조회된 주문 {i+1}: 주문번호={sample_odno}, 종목={sample_pdno}")
+                        else:
+                            logger.warning(f"체결정보 조회 결과가 비어있음 - 시도 {attempt + 1}")
                 
                 else:
-                    logger.warning(f"체결정보 조회 API 실패: {response.get('msg1', '')} - 시도 {attempt + 1}")
+                    # API 호출 실패
+                    error_msg = response.get('msg1', response.get('msg_cd', '알 수 없는 오류'))
+                    logger.warning(f"체결정보 조회 API 실패: {error_msg} - 시도 {attempt + 1}")
+                    
+                    # OPSQ2001 에러인 경우 특별 처리
+                    if "OPSQ2001" in error_msg:
+                        logger.error(f"체결정보 조회 파라미터 오류 (OPSQ2001) - 주문번호: {order_no}")
+                        # OPSQ2001 에러는 재시도해도 해결되지 않으므로 중단
+                        break
                 
             except Exception as e:
                 logger.warning(f"체결정보 재시도 {attempt + 1} 실패: {e}")

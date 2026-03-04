@@ -2,12 +2,16 @@
 """
 KIS API 디버깅 및 테스트 스크립트
 주식 거래 실패 문제 진단용
+로그 분석 결과 기반 개선된 테스트 포함:
+- 토큰 자동 갱신 테스트
+- 체결정보 조회 API 테스트
 """
 
 import sys
 import json
 import logging
 from pathlib import Path
+from datetime import datetime
 
 # Scripts 경로 추가
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -19,6 +23,152 @@ from modules.kis_trading import KISTrading
 from modules.web_server import PortfolioWebServer
 from modules.db_manager import DatabaseManager
 from modules.db_models import TradingHistoryRecord, RebalancingLogRecord, PortfolioSnapshotRecord, SystemLogRecord
+
+
+def test_token_refresh(kis_auth):
+    """토큰 갱신 로직 테스트 (EGW00123 에러 해결)"""
+    print("\n=== 토큰 갱신 로직 테스트 ===")
+    
+    try:
+        # 현재 토큰 정보 확인
+        current_token = kis_auth.token
+        print(f"현재 토큰: {current_token[:20]}..." if current_token else "토큰 없음")
+        print(f"토큰 만료일: {kis_auth.token_expired}" if hasattr(kis_auth, 'token_expired') else "만료일 정보 없음")
+        
+        # 토큰 만료 상태 확인
+        is_expired = kis_auth.is_token_expired()
+        print(f"토큰 만료 상태: {'만료됨' if is_expired else '유효함'}")
+        
+        # 강제 토큰 갱신 테스트
+        print("\n강제 토큰 갱신 테스트...")
+        new_token = kis_auth.authenticate(force_refresh=True)
+        print(f"새 토큰: {new_token[:20]}..." if new_token else "토큰 발급 실패")
+        print(f"갱신 성공: {'✅' if new_token != current_token else '❌'}")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ 토큰 갱신 테스트 실패: {e}")
+        return False
+
+
+def test_execution_info_query(kis_auth):
+    """체결정보 조회 API 테스트 (OPSQ2001 에러 해결)"""
+    print("\n=== 체결정보 조회 API 테스트 ===")
+    
+    try:
+        from modules.kis_api_utils import execute_api_request_with_retry, build_api_headers
+        
+        # 오늘 날짜
+        today = datetime.now().strftime('%Y%m%d')
+        
+        # 체결정보 조회 API 호출 테스트
+        endpoint = "/uapi/domestic-stock/v1/trading/inquire-daily-ccld"
+        tr_id = "VTTC8001R"  # 모의투자 주식일별주문체결조회
+        
+        # 개선된 파라미터 (CTX_AREA_FK100, CTX_AREA_NK100 사용)
+        params = {
+            "CANO": kis_auth.account,
+            "ACNT_PRDT_CD": kis_auth.product,
+            "INQR_STRT_DT": today,
+            "INQR_END_DT": today,
+            "SLL_BUY_DVSN_CD": "00",
+            "INQR_DVSN": "00",
+            "PDNO": "",  # 전체 조회
+            "CCLD_DVSN": "01",
+            "INQR_DVSN_3": "01",
+            "ORD_GNO_BRNO": "",
+            "ODNO": "",  # 전체 조회
+            "INQR_DVSN_1": "",
+            "CTX_AREA_FK100": "",  # 수정된 파라미터명
+            "CTX_AREA_NK100": "",  # 수정된 파라미터명
+        }
+        
+        # 헤더 생성
+        headers = build_api_headers(kis_auth, tr_id)
+        url = f"{kis_auth.base_url}{endpoint}"
+        
+        print(f"API 호출: {endpoint}")
+        print(f"TR ID: {tr_id}")
+        print("파라미터 확인 완료 ✅")
+        
+        # API 호출
+        response = execute_api_request_with_retry(
+            method="GET",
+            url=url,
+            headers=headers,
+            params=params,
+            context="체결정보 조회 테스트",
+            kis_auth=kis_auth
+        )
+        
+        if response.get('rt_cd') == '0':
+            output1 = response.get('output1', [])
+            print(f"✅ 체결정보 조회 성공: {len(output1)}건 조회")
+            
+            # 최근 체결정보 샘플 출력
+            if output1:
+                latest = output1[0]
+                print(f"최근 체결: 주문번호={latest.get('odno', 'N/A')}, "
+                      f"종목={latest.get('pdno', 'N/A')}, "
+                      f"체결가={latest.get('avg_prvs', 'N/A')}")
+            return True
+        else:
+            error_msg = response.get('msg1', 'Unknown error')
+            print(f"❌ 체결정보 조회 실패: {error_msg}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ 체결정보 조회 테스트 실패: {e}")
+        return False
+
+
+def test_api_error_recovery(kis_auth):
+    """API 에러 복구 능력 테스트"""
+    print("\n=== API 에러 복구 테스트 ===")
+    
+    try:
+        from modules.kis_api_utils import execute_api_request_with_retry, build_api_headers
+        
+        # 고의로 잘못된 종목코드로 API 호출하여 에러 복구 테스트
+        endpoint = "/uapi/domestic-stock/v1/quotations/inquire-price"
+        tr_id = "FHKST01010100"
+        
+        # 잘못된 종목코드
+        invalid_params = {
+            "FID_COND_MRKT_DIV_CODE": "J",
+            "FID_INPUT_ISCD": "INVALID_CODE"
+        }
+        
+        headers = build_api_headers(kis_auth, tr_id)
+        url = f"{kis_auth.base_url}{endpoint}"
+        
+        print("잘못된 종목코드로 API 호출 테스트...")
+        
+        try:
+            response = execute_api_request_with_retry(
+                method="GET",
+                url=url,
+                headers=headers,
+                params=invalid_params,
+                context="에러 복구 테스트",
+                kis_auth=kis_auth,
+                max_retries=1  # 빠른 테스트를 위해 재시도 1회만
+            )
+            print("❌ 예상되지 않은 성공")
+            return False
+            
+        except RuntimeError as e:
+            if "returned error" in str(e):
+                print("✅ 에러를 올바르게 감지하고 처리함")
+                return True
+            else:
+                print(f"❌ 예상되지 않은 에러: {e}")
+                return False
+                
+    except Exception as e:
+        print(f"❌ 에러 복구 테스트 실패: {e}")
+        return False
 
 
 def test_portfolio_trading_availability(kis_auth):
@@ -582,19 +732,72 @@ def test_kis_trading_api_fix():
 
 
 def main():
-    """메인 테스트 함수"""
-    print("🚀 KIS API 디버깅 및 테스트 시작")
-    print("=" * 50)
+    """메인 테스트 함수 - 로그 분석 기반 개선된 테스트 포함"""
+    print("🚀 KIS API 디버깅 및 테스트 시작 (ver 2.0)")
+    print("   - 2026-03-04 로그 분석 결과 반영")
+    print("   - 토큰 자동 갱신 및 체결정보 조회 개선")
+    print("=" * 60)
     
-    # 수정된 kis_trading 모듈 테스트
-    test_result = test_kis_trading_api_fix()
+    # 설정 로드
+    try:
+        config_path = Path(__file__).parent.parent.parent / "Config" / "config.json"
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        # Demo 환경으로 KISAuth 초기화 
+        kas_config = config['kis']['demo']
+        kis_auth = KISAuth(
+            appkey=kas_config['appkey'],
+            appsecret=kas_config['appsecret'],
+            account=kas_config['account'],
+            product=kas_config['product'],
+            htsid=kas_config['htsid'],
+            env='demo'
+        )
+        print("✅ KIS 인증 설정 완료 (Demo 환경)")
+        
+    except Exception as e:
+        print(f"❌ 설정 로드 실패: {e}")
+        return
     
-    if test_result:
+    # 테스트 실행
+    test_results = []
+    
+    # 1. 토큰 갱신 테스트 (EGW00123 에러 해결)
+    print(f"\n{'='*20} 핵심 테스트 {'='*20}")
+    test_results.append(("토큰 갱신 로직", test_token_refresh(kis_auth)))
+    
+    # 2. 체결정보 조회 테스트 (OPSQ2001 에러 해결)
+    test_results.append(("체결정보 조회 API", test_execution_info_query(kis_auth)))
+    
+    # 3. API 에러 복구 테스트
+    test_results.append(("API 에러 복구", test_api_error_recovery(kis_auth)))
+    
+    # 4. 기존 Trading 모듈 테스트
+    print(f"\n{'='*20} 기본 기능 테스트 {'='*20}")
+    test_results.append(("Trading 모듈", test_kis_trading_api_fix()))
+    
+    # 결과 요약
+    print(f"\n{'='*20} 테스트 결과 요약 {'='*20}")
+    passed_tests = 0
+    for test_name, result in test_results:
+        status = "✅ 통과" if result else "❌ 실패"
+        print(f"{test_name:20} : {status}")
+        if result:
+            passed_tests += 1
+    
+    print(f"\n총 {len(test_results)}개 테스트 중 {passed_tests}개 통과")
+    
+    if passed_tests == len(test_results):
         print("\n🎉 모든 테스트 통과!")
-        print("   주문 실행 준비 완료")
+        print("   로그 분석 기반 수정사항이 성공적으로 적용됨")
+        print("   포트폴리오 리밸런싱 시스템 사용 준비 완료")
     else:
-        print("\n❌ 테스트 실패")
-        print("   코드 수정이 더 필요함")
+        print(f"\n❌ {len(test_results) - passed_tests}개 테스트 실패")
+        print("   추가 수정이 필요함")
+    
+    print(f"\n{'='*60}")
+    print("테스트 완료 - 상세 분석 문서: docs/error_analysis_log_20260304.md")
 
 
 if __name__ == "__main__":

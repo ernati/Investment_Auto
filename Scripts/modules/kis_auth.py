@@ -81,20 +81,24 @@ class KISAuth:
             print(f"토큰 읽기 오류: {e}")
             return None
     
-    def authenticate(self):
+    def authenticate(self, force_refresh=False):
         """API 인증을 수행하고 토큰을 발급받습니다.
         
+        Args:
+            force_refresh (bool): 강제로 새로운 토큰을 발급받을지 여부
+            
         Returns:
             str: 액세스 토큰
         """
-        # 저장된 토큰 확인
-        saved_token = self._read_token()
-        if saved_token:
-            self.token = saved_token
-            self.last_auth_time = datetime.now()
-            return self.token
+        # 강제 갱신이 아닌 경우에만 저장된 토큰 확인
+        if not force_refresh:
+            saved_token = self._read_token()
+            if saved_token:
+                self.token = saved_token
+                self.last_auth_time = datetime.now()
+                return self.token
         
-        # 새 토큰 발급
+        # 새 토큰 발급 또는 강제 갱신
         url = f"{self.base_url}/oauth2/tokenP"
         headers = {
             "Content-Type": "application/json",
@@ -107,20 +111,59 @@ class KISAuth:
             "appsecret": self.appsecret
         }
         
-        response = requests.post(url, headers=headers, data=json.dumps(data))
+        try:
+            response = requests.post(url, headers=headers, data=json.dumps(data))
+            
+            if response.status_code == 200:
+                result = response.json()
+                self.token = result['access_token']
+                self.token_expired = result['access_token_token_expired']
+                self.last_auth_time = datetime.now()
+                
+                # 토큰 저장
+                self._save_token(self.token, self.token_expired)
+                
+                return self.token
+            else:
+                raise Exception(f"인증 실패: {response.status_code}, {response.text}")
+                
+        except Exception as e:
+            # 토큰 발급 실패 시 기존 토큰 파일 삭제
+            if self.token_file.exists():
+                self.token_file.unlink()
+            raise Exception(f"토큰 발급 중 오류 발생: {str(e)}")
+    
+    def is_token_expired(self):
+        """현재 토큰의 만료 여부를 확인합니다.
         
-        if response.status_code == 200:
-            result = response.json()
-            self.token = result['access_token']
-            self.token_expired = result['access_token_token_expired']
-            self.last_auth_time = datetime.now()
+        Returns:
+            bool: 토큰이 만료되었거나 없으면 True
+        """
+        if not self.token or not self.token_expired:
+            return True
             
-            # 토큰 저장
-            self._save_token(self.token, self.token_expired)
-            
-            return self.token
-        else:
-            raise Exception(f"인증 실패: {response.status_code}, {response.text}")
+        try:
+            valid_date = datetime.strptime(self.token_expired, "%Y-%m-%d %H:%M:%S")
+            now = datetime.now()
+            # 만료 5분 전부터 갱신하도록 Buffer 적용
+            return (valid_date - now).total_seconds() < 300  # 5분
+        except:
+            return True
+    
+    def refresh_token_if_needed(self):
+        """필요한 경우 토큰을 갱신합니다.
+        
+        Returns:
+            bool: 토큰 갱신 여부
+        """
+        if self.is_token_expired():
+            try:
+                self.authenticate(force_refresh=True)
+                return True
+            except Exception as e:
+                print(f"토큰 갱신 실패: {e}")
+                return False
+        return False
     
     def get_headers(self, tr_id, tr_cont=""):
         """API 호출에 필요한 헤더를 생성합니다.

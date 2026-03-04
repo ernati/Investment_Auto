@@ -205,6 +205,19 @@ def execute_api_request_with_retry(
             # API 응답 검증
             success, error_msg = validate_api_response(data, context)
             if not success:
+                # 토큰 만료 에러인 경우 토큰 갱신 후 재시도
+                if "EGW00123" in error_msg and kis_auth is not None:
+                    logger.warning(f"{context}: Token expired, attempting refresh...")
+                    try:
+                        kis_auth.authenticate(force_refresh=True)
+                        # 헤더 업데이트 (새로운 토큰으로)
+                        headers["authorization"] = f"Bearer {kis_auth.token}"
+                        logger.info(f"{context}: Token refreshed, retrying request...")
+                        continue  # 재시도
+                    except Exception as refresh_error:
+                        logger.error(f"{context}: Token refresh failed - {refresh_error}")
+                        # 토큰 갱신 실패 시 원래 에러로 처리
+                        
                 # Rate limiting 오류인 경우 재시도
                 if "EGW00201" in error_msg or "초당 거래건수" in error_msg:
                     if attempt < max_retries:
@@ -233,6 +246,17 @@ def execute_api_request_with_retry(
                     
                     if msg_cd or msg1:
                         detailed_error = f"[{msg_cd}] {msg1}" if msg_cd else msg1
+                        
+                        # 토큰 만료 에러인 경우 토큰 갱신 후 재시도
+                        if "EGW00123" in detailed_error and kis_auth is not None:
+                            logger.warning(f"{context}: Token expired in HTTP error, attempting refresh...")
+                            try:
+                                kis_auth.authenticate(force_refresh=True)
+                                headers["authorization"] = f"Bearer {kis_auth.token}"
+                                logger.info(f"{context}: Token refreshed, retrying request...")
+                                continue
+                            except Exception as refresh_error:
+                                logger.error(f"{context}: Token refresh failed in HTTP error - {refresh_error}")
                         
                         # Rate limiting 오류인 경우 재시도
                         if "EGW00201" in detailed_error or "초당 거래건수" in detailed_error:
