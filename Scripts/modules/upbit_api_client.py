@@ -99,7 +99,7 @@ class UpbitClient:
                 # 계좌번호가 없으면 config에서 기본 KIS 계좌 사용
                 config = get_config()
                 kis_config = config.get_kis_config("demo")
-                account = kis_config.get("account_number", "00000000")
+                account = kis_config.get("account", "00000000")
             self._demo_manager = DemoUpbitCashManager(account)
         
         logger.info(f"UpbitClient 초기화: env={auth.env}, demo_mode={self.is_demo}")
