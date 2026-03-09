@@ -40,12 +40,38 @@ class DemoCashManager:
             initial_data = {
                 "account": self.account,
                 "cash_balance": 10000000,  # 초기 1000만원
+                "upbit_krw_balance": 2000000,  # Upbit 초기 200만원
+                "upbit_btc_balance": 0.0,  # Upbit 초기 BTC 0
+                "upbit_avg_buy_price": 0.0,  # Upbit BTC 평균 매수가
                 "created_at": datetime.now().isoformat(),
                 "updated_at": datetime.now().isoformat(),
-                "transaction_history": []
+                "transaction_history": [],
+                "upbit_transaction_history": []
             }
             self._save_data(initial_data)
             logger.info(f"초기 계좌 현금 잔액 설정: {initial_data['cash_balance']:,}원 (계좌: {self.account})")
+            logger.info(f"초기 Upbit 잔액 설정: KRW={initial_data['upbit_krw_balance']:,}원, BTC={initial_data['upbit_btc_balance']}")
+        else:
+            # 기존 파일에 Upbit 필드가 없으면 추가
+            data = self._load_data()
+            updated = False
+            
+            if "upbit_krw_balance" not in data:
+                data["upbit_krw_balance"] = 2000000
+                updated = True
+            if "upbit_btc_balance" not in data:
+                data["upbit_btc_balance"] = 0.0
+                updated = True
+            if "upbit_avg_buy_price" not in data:
+                data["upbit_avg_buy_price"] = 0.0
+                updated = True
+            if "upbit_transaction_history" not in data:
+                data["upbit_transaction_history"] = []
+                updated = True
+            
+            if updated:
+                self._save_data(data)
+                logger.info(f"기존 cash 파일에 Upbit 필드 추가됨")
     
     def _load_data(self) -> Dict[str, Any]:
         """현금 데이터를 로드합니다."""
@@ -235,3 +261,230 @@ def get_demo_cash_manager(account: str) -> DemoCashManager:
         DemoCashManager: 가상 현금 관리자 인스턴스
     """
     return DemoCashManager(account)
+
+
+class DemoUpbitCashManager:
+    """
+    데모 모드용 Upbit 가상 현금/비트코인 관리 클래스
+    DemoCashManager와 동일한 파일을 사용하여 영속성 제공
+    """
+    
+    def __init__(self, account: str):
+        """
+        Args:
+            account (str): 계좌번호 (KIS 계좌와 동일)
+        """
+        self.account = account
+        self._cash_manager = get_demo_cash_manager(account)
+        
+        # 초기 잔액 로드
+        data = self._cash_manager._load_data()
+        self.krw_balance = float(data.get("upbit_krw_balance", 2000000))
+        self.btc_balance = float(data.get("upbit_btc_balance", 0.0))
+        self.buy_price = float(data.get("upbit_avg_buy_price", 0.0))
+        
+        logger.info(
+            f"DemoUpbitCashManager 초기화 (파일 기반): "
+            f"KRW={self.krw_balance:,.0f}, BTC={self.btc_balance:.8f}"
+        )
+    
+    def _save_to_file(self):
+        """현재 Upbit 잔액을 파일에 저장"""
+        data = self._cash_manager._load_data()
+        data["upbit_krw_balance"] = self.krw_balance
+        data["upbit_btc_balance"] = self.btc_balance
+        data["upbit_avg_buy_price"] = self.buy_price
+        data["updated_at"] = datetime.now().isoformat()
+        self._cash_manager._save_data(data)
+    
+    def get_balances(self) -> Dict[str, float]:
+        """현재 잔액 반환"""
+        return {
+            "krw": self.krw_balance,
+            "btc": self.btc_balance,
+            "avg_buy_price": self.buy_price
+        }
+    
+    def buy(self, krw_amount: float, current_price: float) -> Dict[str, Any]:
+        """
+        가상 비트코인 매수
+        
+        Args:
+            krw_amount (float): 매수할 KRW 금액
+            current_price (float): 현재 비트코인 가격
+            
+        Returns:
+            dict: 거래 결과
+        """
+        if krw_amount > self.krw_balance:
+            return {
+                "success": False,
+                "error": f"잔액 부족: {self.krw_balance:,.0f} < {krw_amount:,.0f}"
+            }
+        
+        # 수수료 (0.05%)
+        fee_rate = 0.0005
+        net_amount = krw_amount * (1 - fee_rate)
+        btc_quantity = net_amount / current_price
+        
+        # 평균 매수가 계산
+        if self.btc_balance > 0:
+            total_cost = (self.btc_balance * self.buy_price) + net_amount
+            total_btc = self.btc_balance + btc_quantity
+            self.buy_price = total_cost / total_btc
+        else:
+            self.buy_price = current_price
+        
+        # 잔고 업데이트
+        self.krw_balance -= krw_amount
+        self.btc_balance += btc_quantity
+        
+        # 파일에 저장
+        self._save_to_file()
+        
+        # 거래 기록 추가
+        self._add_transaction({
+            "type": "buy",
+            "krw_amount": krw_amount,
+            "btc_quantity": btc_quantity,
+            "price": current_price,
+            "fee": krw_amount * fee_rate,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        logger.info(
+            f"[DEMO] BUY: {btc_quantity:.8f} BTC @ {current_price:,.0f}, "
+            f"잔액: KRW={self.krw_balance:,.0f}, BTC={self.btc_balance:.8f}"
+        )
+        
+        return {
+            "success": True,
+            "btc_quantity": btc_quantity,
+            "krw_spent": krw_amount,
+            "price": current_price,
+            "fee": krw_amount * fee_rate,
+            "remaining_krw": self.krw_balance,
+            "total_btc": self.btc_balance
+        }
+    
+    def sell(self, btc_quantity: float, current_price: float) -> Dict[str, Any]:
+        """
+        가상 비트코인 매도
+        
+        Args:
+            btc_quantity (float): 매도할 BTC 수량
+            current_price (float): 현재 비트코인 가격
+            
+        Returns:
+            dict: 거래 결과
+        """
+        if btc_quantity > self.btc_balance:
+            return {
+                "success": False,
+                "error": f"BTC 잔액 부족: {self.btc_balance:.8f} < {btc_quantity:.8f}"
+            }
+        
+        # 수수료 (0.05%)
+        fee_rate = 0.0005
+        gross_amount = btc_quantity * current_price
+        net_amount = gross_amount * (1 - fee_rate)
+        
+        # 손익 계산
+        cost_basis = btc_quantity * self.buy_price
+        pnl = net_amount - cost_basis
+        
+        # 잔고 업데이트
+        self.krw_balance += net_amount
+        self.btc_balance -= btc_quantity
+        
+        # BTC가 0이면 평균 매수가 초기화
+        if self.btc_balance <= 0:
+            self.btc_balance = 0.0
+            self.buy_price = 0.0
+        
+        # 파일에 저장
+        self._save_to_file()
+        
+        # 거래 기록 추가
+        self._add_transaction({
+            "type": "sell",
+            "btc_quantity": btc_quantity,
+            "krw_received": net_amount,
+            "price": current_price,
+            "fee": gross_amount * fee_rate,
+            "pnl": pnl,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        logger.info(
+            f"[DEMO] SELL: {btc_quantity:.8f} BTC @ {current_price:,.0f}, "
+            f"PnL={pnl:+,.0f}, 잔액: KRW={self.krw_balance:,.0f}, BTC={self.btc_balance:.8f}"
+        )
+        
+        return {
+            "success": True,
+            "btc_quantity": btc_quantity,
+            "krw_received": net_amount,
+            "price": current_price,
+            "fee": gross_amount * fee_rate,
+            "pnl": pnl,
+            "remaining_krw": self.krw_balance,
+            "remaining_btc": self.btc_balance
+        }
+    
+    def _add_transaction(self, record: Dict[str, Any]):
+        """Upbit 거래 기록 추가"""
+        data = self._cash_manager._load_data()
+        if "upbit_transaction_history" not in data:
+            data["upbit_transaction_history"] = []
+        data["upbit_transaction_history"].append(record)
+        self._cash_manager._save_data(data)
+    
+    def get_evaluation(self, current_price: float) -> Dict[str, float]:
+        """
+        현재 평가액 계산
+        
+        Args:
+            current_price (float): 현재 비트코인 가격
+            
+        Returns:
+            dict: 평가 정보
+        """
+        btc_value = self.btc_balance * current_price
+        total_value = self.krw_balance + btc_value
+        
+        return {
+            "krw_balance": self.krw_balance,
+            "btc_balance": self.btc_balance,
+            "btc_value": btc_value,
+            "total_value": total_value,
+            "avg_buy_price": self.buy_price,
+            "current_price": current_price
+        }
+    
+    def get_transaction_history(self, limit: int = 50) -> list:
+        """
+        Upbit 거래 내역을 반환합니다.
+        
+        Args:
+            limit (int): 반환할 최대 건수
+            
+        Returns:
+            list: 거래 내역 리스트 (최신순)
+        """
+        data = self._cash_manager._load_data()
+        history = data.get("upbit_transaction_history", [])
+        return list(reversed(history))[-limit:]
+
+
+def get_demo_upbit_cash_manager(account: str) -> DemoUpbitCashManager:
+    """
+    계좌별 Upbit 가상 현금 관리자 인스턴스를 반환합니다.
+    
+    Args:
+        account (str): 계좌번호
+        
+    Returns:
+        DemoUpbitCashManager: Upbit 가상 현금 관리자 인스턴스
+    """
+    return DemoUpbitCashManager(account)

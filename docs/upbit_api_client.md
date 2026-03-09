@@ -110,26 +110,37 @@ client = get_upbit_client("demo", reload=True)
         },
         "demo": {
             "access_key": "DEMO_UPBIT_ACCESS_KEY",
-            "secret_key": "DEMO_UPBIT_SECRET_KEY",
-            "initial_krw_balance": 2000000,
-            "initial_btc_balance": 0.0
+            "secret_key": "DEMO_UPBIT_SECRET_KEY"
         }
     }
 }
 ```
 
+> **Note**: 데모 모드의 초기 잔액은 `demo_data/cash_{account}.json` 파일에서 관리됩니다 (KIS와 통합).
+
 ## 데모 모드 동작
 
 데모 모드(`env="demo"`)에서는:
 
-1. **실제 API 미호출**: Upbit API를 호출하지 않습니다.
-2. **메모리 기반 거래**: 가상 잔액이 메모리 내에서 관리됩니다.
-3. **비트코인 가격은 실제 조회**: 가격 정보는 실제 API에서 가져옵니다.
-4. **프로세스 종료 시 초기화**: 데모 잔액은 프로세스 종료 시 사라집니다.
+1. **실제 API 미호출**: Upbit 주문 API를 호출하지 않습니다.
+2. **파일 기반 거래**: 가상 잔액이 `demo_data/cash_{account}.json` 파일에서 관리됩니다.
+3. **KIS와 통합 관리**: KIS 데모 현금과 동일한 파일에 Upbit 잔액도 저장됩니다.
+4. **비트코인 가격은 실제 조회**: 가격 정보는 실제 API에서 가져옵니다.
+5. **영속성 유지**: 프로세스 종료 후에도 잔액이 파일에 저장되어 유지됩니다.
 
-이 동작은 요구사항에 따라 의도적으로 설계되었습니다:
-- Upbit은 모의투자 환경을 제공하지 않음
-- 매번 프로세스 시작 시 초기 자금으로 리밸런싱 시작
+### 데모 현금 파일 구조
+
+```json
+{
+    "account": "12345678",
+    "cash_balance": 590300,      // KIS 현금
+    "transaction_history": [...], // KIS 거래 내역
+    "upbit_krw_balance": 2000000, // Upbit KRW 잔액
+    "upbit_btc_balance": 0.0,     // Upbit BTC 잔액
+    "upbit_avg_buy_price": 0.0,   // Upbit 평균 매수가
+    "upbit_transaction_history": [] // Upbit 거래 내역
+}
+```
 
 ## 에러 처리
 

@@ -44,13 +44,13 @@
         },
         "demo": {
             "access_key": "DEMO_KEY",
-            "secret_key": "DEMO_SECRET",
-            "initial_krw_balance": 2000000,
-            "initial_btc_balance": 0.0
+            "secret_key": "DEMO_SECRET"
         }
     }
 }
 ```
+
+> **Note**: 데모 모드의 Upbit 초기 잔액은 `demo_data/cash_{account}.json` 파일에서 KIS 현금과 함께 관리됩니다.
 
 ### 2. 새로운 모듈
 
