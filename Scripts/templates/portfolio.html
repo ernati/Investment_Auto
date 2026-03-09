@@ -332,12 +332,19 @@
                         <div class="value" id="totalAssets">-</div>
                     </div>
                     <div class="card">
-                        <h3>현금</h3>
+                        <h3>총 현금</h3>
                         <div class="value" id="cash">-</div>
+                        <div style="font-size: 0.8rem; color: #888; margin-top: 0.5rem;">
+                            KIS: <span id="kisCash">-</span> | Upbit: <span id="upbitKrw">-</span>
+                        </div>
                     </div>
                     <div class="card">
                         <h3>주식 평가액</h3>
                         <div class="value" id="stockValue">-</div>
+                    </div>
+                    <div class="card" id="cryptoCard" style="display: none;">
+                        <h3>암호화폐 평가액</h3>
+                        <div class="value" id="cryptoValue">-</div>
                     </div>
                     <div class="card">
                         <h3>보유 종목 수</h3>
@@ -1036,6 +1043,24 @@
             document.getElementById('stockValue').textContent = formatNumber(summary.total_stock_value) + ' 원';
             document.getElementById('positionCount').textContent = data.positions.length + ' 개';
             
+            // KIS/Upbit 현금 세부 정보 (있는 경우)
+            const kisCashEl = document.getElementById('kisCash');
+            const upbitKrwEl = document.getElementById('upbitKrw');
+            if (kisCashEl && summary.kis_cash !== undefined) {
+                kisCashEl.textContent = formatNumber(summary.kis_cash) + '원';
+            }
+            if (upbitKrwEl && summary.upbit_krw !== undefined) {
+                upbitKrwEl.textContent = formatNumber(summary.upbit_krw) + '원';
+            }
+            
+            // 암호화폐 평가액 (있는 경우)
+            const cryptoCard = document.getElementById('cryptoCard');
+            const cryptoValueEl = document.getElementById('cryptoValue');
+            if (cryptoCard && cryptoValueEl && summary.total_crypto_value !== undefined && summary.total_crypto_value > 0) {
+                cryptoCard.style.display = 'block';
+                cryptoValueEl.textContent = formatNumber(summary.total_crypto_value) + ' 원';
+            }
+            
             // 차트 업데이트
             updateChart(summary, data.positions);
             
@@ -1125,9 +1150,22 @@
             
             positions.forEach(position => {
                 const row = tbody.insertRow();
+                // 카테고리에 따른 배지 색상
+                let categoryBadge = '';
+                if (position.category === 'crypto') {
+                    categoryBadge = '<span style="background: #F7931A; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 4px;">암호화폐</span>';
+                } else if (position.category === 'bonds') {
+                    categoryBadge = '<span style="background: #28a745; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 4px;">채권</span>';
+                }
+                
+                // 수량 표시 (비트코인은 소수점 8자리)
+                const quantityDisplay = position.category === 'crypto' 
+                    ? position.quantity.toFixed(8) 
+                    : formatNumber(position.quantity);
+                
                 row.innerHTML = `
-                    <td>${position.ticker}</td>
-                    <td class="amount">${formatNumber(position.quantity)}</td>
+                    <td>${position.ticker}${categoryBadge}</td>
+                    <td class="amount">${quantityDisplay}</td>
                     <td class="amount">${formatNumber(position.current_price)}원</td>
                     <td class="amount">${formatNumber(position.market_value)}원</td>
                     <td class="percentage">${position.ratio.toFixed(2)}%</td>

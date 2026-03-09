@@ -172,6 +172,66 @@ class UnifiedPortfolioFetcher:
     def get_bitcoin_info(self) -> Dict:
         """비트코인 정보를 반환합니다."""
         return self.upbit_client.get_btc_evaluation()
+    
+    def get_portfolio_snapshot(self) -> Dict:
+        """
+        웹 서버용 포트폴리오 스냅샷을 반환합니다.
+        
+        Returns:
+            dict: 포트폴리오 스냅샷 딕셔너리
+        """
+        # KIS 잔고 및 보유 종목 조회
+        kis_balance = self.kis_fetcher.fetch_account_balance()
+        kis_holdings = self.kis_fetcher.fetch_holdings()
+        
+        kis_cash = kis_balance.get('cash', 0)
+        
+        # Upbit 정보 조회
+        upbit_info = self.upbit_client.get_btc_evaluation()
+        upbit_krw = upbit_info.get('krw_balance', 0) if upbit_info.get('success') else 0
+        btc_balance = upbit_info.get('btc_balance', 0) if upbit_info.get('success') else 0
+        btc_price = upbit_info.get('current_price', 0) if upbit_info.get('success') else 0
+        btc_value = upbit_info.get('btc_value', 0) if upbit_info.get('success') else 0
+        
+        # 주식 정보 수집
+        stocks = []
+        total_stock_value = 0
+        for ticker, quantity in kis_holdings.items():
+            try:
+                current_price = self.kis_fetcher.fetch_current_price(ticker)
+                market_value = current_price * quantity
+                total_stock_value += market_value
+                stocks.append({
+                    'ticker': ticker,
+                    'name': ticker,  # TODO: 종목명 조회
+                    'quantity': quantity,
+                    'current_price': current_price,
+                    'market_value': market_value
+                })
+            except Exception as e:
+                logger.warning(f"Failed to fetch price for {ticker}: {e}")
+        
+        # 총 자산 계산
+        total_cash = kis_cash + upbit_krw
+        total_assets = total_cash + total_stock_value + btc_value
+        
+        return {
+            'total_assets': total_assets,
+            'cash': {
+                'total': total_cash,
+                'kis_krw': kis_cash,
+                'upbit_krw': upbit_krw
+            },
+            'stocks': stocks,
+            'bonds': [],  # TODO: 채권 지원
+            'crypto': {
+                'bitcoin': {
+                    'quantity': btc_balance,
+                    'current_price': btc_price,
+                    'market_value': btc_value
+                }
+            }
+        }
 
 
 def create_unified_fetcher(

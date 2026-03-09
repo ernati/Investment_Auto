@@ -152,7 +152,8 @@ class PortfolioRebalancingApp:
                 self.web_server = PortfolioWebServer(
                     port=self.web_port,
                     host="127.0.0.1",
-                    env=kis_env
+                    env=kis_env,
+                    unified_fetcher=self.portfolio_fetcher  # KIS + Upbit 통합 페처 전달
                 )
                 logger.info(f"Web server initialized on port {self.web_port}")
             except Exception as e:

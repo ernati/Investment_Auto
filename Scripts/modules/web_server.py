@@ -24,7 +24,13 @@ logger = logging.getLogger(__name__)
 class PortfolioWebServer:
     """포트폴리오 상태를 웹으로 표시하는 서버 클래스"""
     
-    def __init__(self, port: int = 5000, host: str = "127.0.0.1", env: str = "demo"):
+    def __init__(
+        self, 
+        port: int = 5000, 
+        host: str = "127.0.0.1", 
+        env: str = "demo",
+        unified_fetcher=None
+    ):
         """
         웹 서버 초기화
         
@@ -32,10 +38,12 @@ class PortfolioWebServer:
             port (int): 서버 포트 번호
             host (str): 서버 호스트 주소
             env (str): 환경 설정 ('demo' 또는 'real')
+            unified_fetcher: UnifiedPortfolioFetcher 인스턴스 (KIS + Upbit 통합)
         """
         self.port = port
         self.host = host
         self.env = env
+        self.unified_fetcher = unified_fetcher  # Upbit 포함 통합 페처
         
         # Flask 앱 초기화 (템플릿 경로 설정)
         template_dir = Path(__file__).parent.parent / "templates"
@@ -215,6 +223,10 @@ class PortfolioWebServer:
             (now - self._last_update).seconds < self._cache_duration):
             return self._portfolio_cache
         
+        # UnifiedPortfolioFetcher가 있으면 통합 데이터 사용
+        if self.unified_fetcher:
+            return self._get_unified_portfolio_data(now)
+        
         if not self.portfolio_fetcher:
             return {'error': 'KIS API not available'}
         
@@ -289,6 +301,127 @@ class PortfolioWebServer:
             
         except Exception as e:
             logger.error(f"Failed to fetch portfolio data: {e}")
+            return {
+                'error': str(e),
+                'timestamp': now.isoformat(),
+                'environment': self.env
+            }
+    
+    def _get_unified_portfolio_data(self, now: datetime) -> Dict:
+        """
+        통합 포트폴리오 데이터 조회 (KIS + Upbit)
+        
+        Args:
+            now: 현재 시간
+            
+        Returns:
+            dict: 통합 포트폴리오 데이터
+        """
+        try:
+            # UnifiedPortfolioFetcher에서 스냅샷 가져오기
+            snapshot = self.unified_fetcher.get_portfolio_snapshot()
+            
+            # 포지션 데이터 구성
+            positions = []
+            
+            # 주식 포지션
+            for stock in snapshot.get('stocks', []):
+                positions.append({
+                    'ticker': stock['ticker'],
+                    'name': stock.get('name', stock['ticker']),
+                    'category': 'stocks',
+                    'quantity': stock['quantity'],
+                    'current_price': stock['current_price'],
+                    'market_value': stock['market_value'],
+                    'ratio': 0  # 나중에 계산
+                })
+            
+            # 채권 포지션
+            for bond in snapshot.get('bonds', []):
+                positions.append({
+                    'ticker': bond['ticker'],
+                    'name': bond.get('name', bond['ticker']),
+                    'category': 'bonds',
+                    'quantity': bond['quantity'],
+                    'current_price': bond['current_price'],
+                    'market_value': bond['market_value'],
+                    'ratio': 0
+                })
+            
+            # 비트코인 포지션
+            bitcoin = snapshot.get('crypto', {}).get('bitcoin', {})
+            if bitcoin.get('quantity', 0) > 0:
+                positions.append({
+                    'ticker': 'BTC',
+                    'name': 'Bitcoin',
+                    'category': 'crypto',
+                    'quantity': bitcoin['quantity'],
+                    'current_price': bitcoin['current_price'],
+                    'market_value': bitcoin['market_value'],
+                    'ratio': 0
+                })
+            
+            # 현금 정보
+            cash_info = snapshot.get('cash', {})
+            kis_cash = cash_info.get('kis_krw', 0)
+            upbit_krw = cash_info.get('upbit_krw', 0)
+            total_cash = cash_info.get('total', kis_cash + upbit_krw)
+            
+            # 자산 합계
+            total_stock_value = sum(p['market_value'] for p in positions if p['category'] == 'stocks')
+            total_bond_value = sum(p['market_value'] for p in positions if p['category'] == 'bonds')
+            total_crypto_value = sum(p['market_value'] for p in positions if p['category'] == 'crypto')
+            total_assets = snapshot.get('total_assets', total_cash + total_stock_value + total_bond_value + total_crypto_value)
+            
+            # 비율 계산
+            if total_assets > 0:
+                cash_ratio = (total_cash / total_assets) * 100
+                for position in positions:
+                    position['ratio'] = (position['market_value'] / total_assets) * 100
+            else:
+                cash_ratio = 0
+            
+            # 결과 데이터 구성
+            portfolio_data = {
+                'timestamp': now.isoformat(),
+                'environment': self.env,
+                'account': self.kis_auth.account if self.kis_auth else 'N/A',
+                'summary': {
+                    'total_assets': total_assets,
+                    'cash': total_cash,
+                    'kis_cash': kis_cash,
+                    'upbit_krw': upbit_krw,
+                    'cash_ratio': cash_ratio,
+                    'total_stock_value': total_stock_value,
+                    'stock_ratio': ((total_stock_value / total_assets) * 100) if total_assets > 0 else 0,
+                    'total_bond_value': total_bond_value,
+                    'bond_ratio': ((total_bond_value / total_assets) * 100) if total_assets > 0 else 0,
+                    'total_crypto_value': total_crypto_value,
+                    'crypto_ratio': ((total_crypto_value / total_assets) * 100) if total_assets > 0 else 0,
+                },
+                'positions': sorted(positions, key=lambda x: x['market_value'], reverse=True),
+                'balance': {
+                    'total_cash': total_cash,
+                    'kis_cash': kis_cash,
+                    'upbit_krw': upbit_krw
+                }
+            }
+            
+            # 캐시 업데이트
+            self._portfolio_cache = portfolio_data
+            self._last_update = now
+            
+            logger.info(
+                f"Unified portfolio data updated: {len(positions)} positions, "
+                f"total assets: {total_assets:,.0f}, "
+                f"KIS cash: {kis_cash:,.0f}, Upbit KRW: {upbit_krw:,.0f}"
+            )
+            return portfolio_data
+            
+        except Exception as e:
+            logger.error(f"Failed to fetch unified portfolio data: {e}")
+            import traceback
+            traceback.print_exc()
             return {
                 'error': str(e),
                 'timestamp': now.isoformat(),
