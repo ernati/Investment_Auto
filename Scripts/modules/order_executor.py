@@ -2,6 +2,7 @@
 """
 Order Execution Module
 실제 주문 실행: 리밸런싱 계획을 KIS API를 통해 주문으로 변환, 실행
+Upbit를 통한 비트코인 주문도 지원
 Dry-run 모드도 지원
 """
 
@@ -13,35 +14,51 @@ from .config_loader import PortfolioConfigLoader
 from .kis_auth import KISAuth
 from .portfolio_models import RebalancePlan, ExecutionResult, RebalanceOrder
 from .kis_trading import KISTrading
+from .upbit_api_client import UpbitClient, get_upbit_client
 
 
 logger = logging.getLogger(__name__)
 
 
+# 코인 티커 상수
+BITCOIN_TICKER = "bitcoin"
+
+
 class OrderExecutor:
-    """주문 실행 엔진"""
+    """주문 실행 엔진 (KIS 주식 + Upbit 비트코인)"""
     
     def __init__(
         self,
         config_loader: PortfolioConfigLoader,
-        kis_auth: KISAuth
+        kis_auth: KISAuth,
+        upbit_client: Optional[UpbitClient] = None,
+        env: str = "demo"
     ):
         """
         Args:
             config_loader (PortfolioConfigLoader): 설정 로더
-            kis_auth (KISAuth): 인증 정보
+            kis_auth (KISAuth): KIS 인증 정보
+            upbit_client (UpbitClient, optional): Upbit 클라이언트
+            env (str): 환경 설정 ('real' 또는 'demo')
         """
         self.config = config_loader
         self.kis_auth = kis_auth
         self.base_url = kis_auth.base_url
+        self.env = env
         
         # KISTrading 인스턴스 생성
         self.trading = KISTrading(kis_auth)
         
+        # Upbit 클라이언트 설정
+        if upbit_client:
+            self.upbit_client = upbit_client
+        else:
+            self.upbit_client = get_upbit_client(env)
+        
         # 설정 로드
         self.order_type = self.config.get_advanced("order_policy/order_type", "market")
         
-        logger.info(f"OrderExecutor initialized: order_type={self.order_type}")
+        logger.info(f"OrderExecutor initialized: order_type={self.order_type}, env={env}")
     
     
     def execute_plan(self, plan: RebalancePlan) -> ExecutionResult:
@@ -93,11 +110,18 @@ class OrderExecutor:
     def _execute_order(self, order: RebalanceOrder, result: ExecutionResult) -> None:
         """
         단일 주문을 실행합니다.
+        비트코인과 주식/채권을 구분하여 처리합니다.
         
         Args:
             order (RebalanceOrder): 주문 정보
             result (ExecutionResult): 실행 결과 객체 (실행된 주문 추가)
         """
+        # 비트코인 주문인지 확인
+        if order.ticker == BITCOIN_TICKER:
+            self._execute_bitcoin_order(order, result)
+            return
+        
+        # 주식/채권 주문
         if order.estimated_quantity <= 0:
             logger.warning(
                 f"Skipping {order.action} order for {order.ticker}: "
@@ -113,6 +137,63 @@ class OrderExecutor:
         
         # 실전 모드: 실제 주문 실행
         self._execute_order_live(order, result)
+    
+    def _execute_bitcoin_order(self, order: RebalanceOrder, result: ExecutionResult) -> None:
+        """
+        비트코인 주문을 실행합니다.
+        
+        Args:
+            order (RebalanceOrder): 주문 정보
+            result (ExecutionResult): 실행 결과 객체
+        """
+        try:
+            if order.action == "buy":
+                krw_amount = abs(order.delta_value)
+                logger.info(f"Executing BTC BUY: {krw_amount:,.0f} KRW")
+                
+                order_result = self.upbit_client.buy_bitcoin(krw_amount)
+                
+                if order_result.get("success"):
+                    result.executed_orders.append({
+                        "symbol": BITCOIN_TICKER,
+                        "side": "buy",
+                        "quantity": order_result.get("btc_quantity", 0),
+                        "price": order_result.get("current_price", 0),
+                        "krw_amount": krw_amount,
+                        "order_id": order_result.get("order_id", "demo"),
+                        "is_demo": self.env == "demo"
+                    })
+                    logger.info(f"BTC buy order completed: {order_result}")
+                else:
+                    raise RuntimeError(f"BTC buy failed: {order_result.get('error')}")
+                    
+            else:  # sell
+                # 매도할 BTC 수량 계산 (delta_value / current_price)
+                btc_price = order.estimated_price
+                btc_quantity = abs(order.delta_value) / btc_price if btc_price > 0 else 0
+                
+                logger.info(f"Executing BTC SELL: {btc_quantity:.8f} BTC")
+                
+                order_result = self.upbit_client.sell_bitcoin(btc_quantity)
+                
+                if order_result.get("success"):
+                    result.executed_orders.append({
+                        "symbol": BITCOIN_TICKER,
+                        "side": "sell",
+                        "quantity": order_result.get("btc_quantity", 0),
+                        "price": order_result.get("current_price", 0),
+                        "krw_received": order_result.get("krw_received", 0),
+                        "pnl": order_result.get("pnl", 0),
+                        "order_id": order_result.get("order_id", "demo"),
+                        "is_demo": self.env == "demo"
+                    })
+                    logger.info(f"BTC sell order completed: {order_result}")
+                else:
+                    raise RuntimeError(f"BTC sell failed: {order_result.get('error')}")
+                    
+        except Exception as e:
+            logger.error(f"Error executing BTC order: {e}")
+            raise
     
     def _execute_order_live(self, order: RebalanceOrder, result: ExecutionResult) -> None:
         """

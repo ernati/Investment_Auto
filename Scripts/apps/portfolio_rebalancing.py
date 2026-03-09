@@ -2,6 +2,7 @@
 """
 Portfolio Rebalancing Application
 포트폴리오 자동 리밸런싱 프로그램 메인 애플리케이션
+KIS 주식/채권 + Upbit 비트코인 통합 리밸런싱 지원
 """
 
 import logging
@@ -16,6 +17,8 @@ from modules.config_loader import get_portfolio_config, get_config
 from modules.config_validator import ConfigValidator
 from modules.kis_auth import KISAuth
 from modules.kis_portfolio_fetcher import KISPortfolioFetcher
+from modules.unified_portfolio_fetcher import UnifiedPortfolioFetcher, create_unified_fetcher
+from modules.upbit_api_client import get_upbit_client
 from modules.scheduler import PortfolioScheduler
 from modules.rebalancing_engine import RebalancingEngine
 from modules.order_executor import OrderExecutor
@@ -123,10 +126,24 @@ class PortfolioRebalancingApp:
         logger.info("KIS Authentication initialized")
         
         # 4. 각 모듈 초기화
-        self.portfolio_fetcher = KISPortfolioFetcher(self.kis_auth)
+        # Upbit 클라이언트 초기화
+        self.upbit_client = get_upbit_client(kis_env)
+        logger.info("Upbit client initialized")
+        
+        # 통합 포트폴리오 페처 초기화 (KIS + Upbit)
+        self.portfolio_fetcher = create_unified_fetcher(self.kis_auth, kis_env)
+        logger.info("Unified portfolio fetcher initialized (KIS + Upbit)")
+        
         self.scheduler = PortfolioScheduler(self.config)
         self.rebalancing_engine = RebalancingEngine(self.config)
-        self.order_executor = OrderExecutor(self.config, self.kis_auth)
+        
+        # 주문 실행기 초기화 (Upbit 클라이언트 포함)
+        self.order_executor = OrderExecutor(
+            self.config, 
+            self.kis_auth, 
+            upbit_client=self.upbit_client,
+            env=kis_env
+        )
 
         # 5. 웹 서버 초기화 (선택사항)
         self.web_server = None
@@ -194,17 +211,18 @@ class PortfolioRebalancingApp:
                     )
                     return False
             
-            # 2. 포트폴리오 스냅샷 생성
+            # 2. 포트폴리오 스냅샷 생성 (KIS + Upbit 통합)
             portfolio_id = self.config.get_basic("portfolio_id")
             target_weights = self.config.get_basic("target_weights", {})
             
-            # 중첩된 target_weights에서 모든 ticker 추출
+            # 중첩된 target_weights에서 모든 ticker 추출 (stocks, bonds, coin)
             all_tickers = []
             for category, assets in target_weights.items():
                 if isinstance(assets, dict):
                     all_tickers.extend(assets.keys())
             
-            portfolio_snapshot = self.portfolio_fetcher.fetch_portfolio_snapshot(
+            # 통합 포트폴리오 스냅샷 조회 (KIS 주식/채권 + Upbit 비트코인)
+            portfolio_snapshot = self.portfolio_fetcher.fetch_unified_portfolio_snapshot(
                 portfolio_id,
                 price_source=self.config.get_basic("rebalance/price_source", "last"),
                 extra_tickers=all_tickers
@@ -217,14 +235,17 @@ class PortfolioRebalancingApp:
                 logger.info(f"Rebalancing not needed: {plan.rebalance_reason}")
                 return False
             
-            # 4. 가드레일 검사
-            passed, message = self.rebalancing_engine.check_guardrails(plan)
-            if not passed:
-                logger.error(f"Guardrail check failed: {message}")
+            # 4. 가드레일 적용 (한도 초과 시 스킵 대신 점진적 조정)
+            adjusted_plan, guardrail_message = self.rebalancing_engine.apply_guardrails(plan)
+            logger.info(f"Guardrails result: {guardrail_message}")
+            
+            # 조정 후 주문이 없으면 스킵
+            if adjusted_plan.total_orders == 0:
+                logger.info("No orders to execute after guardrail adjustment")
                 return False
             
-            # 5. 주문 실행
-            result = self.order_executor.execute_plan(plan)
+            # 5. 조정된 계획으로 주문 실행
+            result = self.order_executor.execute_plan(adjusted_plan)
             
             if result.succeeded:
                 logger.info(f"Plan executed successfully: {len(result.executed_orders)} orders")
@@ -232,7 +253,7 @@ class PortfolioRebalancingApp:
                 
                 # 6. DB 저장 (db_enabled인 경우)
                 if self.db_manager:
-                    self._save_to_database(portfolio_snapshot, plan, result)
+                    self._save_to_database(portfolio_snapshot, adjusted_plan, result)
                 
                 return True
             else:
@@ -240,7 +261,7 @@ class PortfolioRebalancingApp:
                 
                 # 실패 시에도 리밸런싱 로그 저장
                 if self.db_manager:
-                    self._save_rebalancing_log(portfolio_snapshot.portfolio_id, plan, result)
+                    self._save_rebalancing_log(portfolio_snapshot.portfolio_id, adjusted_plan, result)
                 
                 return False
         
@@ -297,11 +318,16 @@ class PortfolioRebalancingApp:
         try:
             env = self.kis_auth.env
             
+            # positions 데이터 안전하게 변환 (dict가 아닐 경우 대비)
+            positions_data = portfolio_snapshot.positions
+            if not isinstance(positions_data, dict):
+                positions_data = positions_data.to_dict() if hasattr(positions_data, 'to_dict') else {}
+            
             # 포트폴리오 스냅샷 저장
             snapshot_record = PortfolioSnapshotRecord(
                 portfolio_id=portfolio_snapshot.portfolio_id,
                 total_value=float(portfolio_snapshot.total_value),
-                positions=portfolio_snapshot.positions,
+                positions=positions_data,
                 environment=env
             )
             self.db_manager.save_portfolio_snapshot(snapshot_record)
@@ -333,12 +359,25 @@ class PortfolioRebalancingApp:
     def _save_rebalancing_log(self, portfolio_id, plan, result):
         """리밸런싱 로그 저장"""
         try:
+            # plan 객체에서 weights 데이터 안전하게 추출
+            target_weights = getattr(plan, 'target_weights', None) or {}
+            current_weights = getattr(plan, 'current_weights', None) or {}
+            new_weights = getattr(plan, 'new_weights', None) or {}
+            
+            # dict가 아닌 경우 변환 시도
+            if not isinstance(target_weights, dict):
+                target_weights = target_weights.to_dict() if hasattr(target_weights, 'to_dict') else {}
+            if not isinstance(current_weights, dict):
+                current_weights = current_weights.to_dict() if hasattr(current_weights, 'to_dict') else {}
+            if not isinstance(new_weights, dict):
+                new_weights = new_weights.to_dict() if hasattr(new_weights, 'to_dict') else {}
+            
             rebalancing_record = RebalancingLogRecord(
                 portfolio_id=portfolio_id,
                 rebalance_reason=plan.rebalance_reason or 'Unknown',
-                target_weights=plan.target_weights if hasattr(plan, 'target_weights') else {},
-                before_weights=plan.current_weights if hasattr(plan, 'current_weights') else {},
-                after_weights=plan.new_weights if hasattr(plan, 'new_weights') else {},
+                target_weights=target_weights,
+                before_weights=current_weights,
+                after_weights=new_weights,
                 orders_executed=len(result.executed_orders) if result.succeeded else 0,
                 status='success' if result.succeeded else 'failed',
                 error_message=result.error_message if not result.succeeded else None,

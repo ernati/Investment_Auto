@@ -128,6 +128,27 @@ class ConfigLoader:
 
         return kis_config
     
+    def get_upbit_config(self, env: str = 'real') -> Dict[str, Any]:
+        """Upbit API 설정을 가져옵니다.
+
+        Args:
+            env (str): 환경 ('real' 또는 'demo')
+
+        Returns:
+            dict: Upbit API 설정
+
+        Raises:
+            ValueError: 해당 환경의 설정이 없을 때
+        """
+        if not self.config:
+            self.load()
+
+        upbit_config = self.config.get('upbit', {}).get(env)
+        if not upbit_config:
+            raise ValueError(f"Upbit 설정을 찾을 수 없습니다: env={env}")
+
+        return upbit_config
+    
     def print_loaded_config(self) -> None:
         """로드된 설정 정보를 출력합니다."""
         if not self.config:

@@ -100,3 +100,7 @@ coverage.xml
 # 개인 설정 파일
 personal_config.py
 my_config.py
+portfolio_rebalancing.log
+Config/config_basic.json
+Config/config.json
+Scripts/modules/__pycache__/config_loader.cpython-312.pyc

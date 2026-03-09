@@ -186,6 +186,7 @@ class RebalancingEngine:
     def _create_orders(self, portfolio_snapshot: PortfolioSnapshot) -> List[RebalanceOrder]:
         """
         주문 계획을 생성합니다.
+        비트코인(coin 카테고리)과 주식/채권을 모두 처리합니다.
         
         Args:
             portfolio_snapshot (PortfolioSnapshot): 포트폴리오 스냅샷
@@ -194,6 +195,9 @@ class RebalancingEngine:
             List[RebalanceOrder]: 주문 목록
         """
         orders = []
+        
+        # 코인 티커 상수
+        BITCOIN_TICKER = "bitcoin"
         
         # 1. 사용 가능한 자산 계산
         usable_total = (
@@ -235,6 +239,38 @@ class RebalancingEngine:
             )
             price = position.price
 
+            # 비트코인 처리 (금액 기반 주문)
+            if ticker == BITCOIN_TICKER:
+                if price <= 0:
+                    logger.warning(
+                        f"Skipping BTC order: missing price (price={price})"
+                    )
+                    continue
+                
+                # 비트코인은 수량 대신 금액으로 주문
+                # estimated_quantity는 1로 설정 (실제 주문은 금액 기반)
+                order = RebalanceOrder(
+                    ticker=ticker,
+                    action=action,
+                    target_value=target_value,
+                    current_value=current_value,
+                    delta_value=delta_value,
+                    delta_weight=delta_weight,
+                    estimated_quantity=1,  # 비트코인은 금액 기반
+                    estimated_price=price
+                )
+                
+                orders.append(order)
+                
+                logger.info(
+                    f"BTC order created: "
+                    f"action={action}, "
+                    f"delta_value={delta_value:,.0f} KRW, "
+                    f"current_weight={current_weight:.4f} -> target_weight={target_weight:.4f}"
+                )
+                continue
+
+            # 주식/채권 처리 (수량 기반 주문)
             if price <= 0:
                 logger.warning(
                     f"Skipping order for {ticker}: missing price (price={price})"
@@ -273,6 +309,7 @@ class RebalancingEngine:
     def check_guardrails(self, plan: RebalancePlan) -> tuple[bool, str]:
         """
         리밸런싱 계획이 위험 가드레일을 통과하는지 확인합니다.
+        (하위 호환성을 위해 유지, apply_guardrails 사용 권장)
         
         Args:
             plan (RebalancePlan): 리밸런싱 계획
@@ -280,52 +317,169 @@ class RebalancingEngine:
         Returns:
             (passed, message): (통과 여부, 메시지)
         """
+        # apply_guardrails를 호출하고)결과 확인
+        adjusted_plan, message = self.apply_guardrails(plan)
+        
+        # 원본과 동일하면 통과, 조정되었으면 부분 통과로 간주
+        if adjusted_plan.total_orders == plan.total_orders:
+            if adjusted_plan.total_delta_value == plan.total_delta_value:
+                return True, message
+        
+        # 조정이 발생했으면 True 반환 (점진적 실행 가능)
+        return True, message
+    
+    def apply_guardrails(self, plan: RebalancePlan) -> tuple[RebalancePlan, str]:
+        """
+        가드레일을 적용하여 주문을 조정합니다.
+        가드레일 초과 시 스킵하는 대신, 한도 내에서 점진적으로 거래합니다.
+        
+        Args:
+            plan (RebalancePlan): 원본 리밸런싱 계획
+            
+        Returns:
+            (adjusted_plan, message): (조정된 계획, 메시지)
+        """
+        import copy
+        
         # 고급 설정에서 가드레일 정보 로드
         max_turnover = self.config.get_advanced("risk_guardrails/max_turnover_per_run", None)
         max_orders = self.config.get_advanced("risk_guardrails/max_orders_per_run", None)
         max_single_order = self.config.get_advanced("risk_guardrails/max_single_order_krw", None)
         
-        # 가드레일 없으면 통과
+        # 가드레일 없으면 원본 반환
         if not any([max_turnover, max_orders, max_single_order]):
             logger.info("No guardrails configured, passing all orders")
-            return True, "No guardrails"
+            return plan, "No guardrails"
         
-        # Turnover 확인
-        if max_turnover is not None:
+        # 조정된 계획 생성 (깊은 복사)
+        adjusted_plan = RebalancePlan(
+            portfolio_id=plan.portfolio_id,
+            timestamp=plan.timestamp,
+            portfolio_snapshot=plan.portfolio_snapshot,
+            should_rebalance=plan.should_rebalance,
+            rebalance_reason=plan.rebalance_reason
+        )
+        
+        # 주문 복사 (조정용)
+        adjusted_orders = []
+        for order in plan.orders:
+            adjusted_orders.append(RebalanceOrder(
+                ticker=order.ticker,
+                action=order.action,
+                target_value=order.target_value,
+                current_value=order.current_value,
+                delta_value=order.delta_value,
+                delta_weight=order.delta_weight,
+                estimated_quantity=order.estimated_quantity,
+                estimated_price=order.estimated_price
+            ))
+        
+        messages = []
+        
+        # 1. 단일 주문 금액 조정 (max_single_order_krw)
+        if max_single_order is not None:
+            for order in adjusted_orders:
+                original_delta = abs(order.delta_value)
+                if original_delta > max_single_order:
+                    # 한도 내로 조정
+                    scale_factor = max_single_order / original_delta
+                    new_quantity = int(order.estimated_quantity * scale_factor)
+                    
+                    if new_quantity > 0:
+                        old_qty = order.estimated_quantity
+                        order.estimated_quantity = new_quantity
+                        # delta_value도 재계산
+                        order.delta_value = (
+                            new_quantity * order.estimated_price 
+                            if order.action == "buy" 
+                            else -new_quantity * order.estimated_price
+                        )
+                        
+                        logger.info(
+                            f"[Guardrail] {order.ticker}: 단일 주문 한도 적용 "
+                            f"({old_qty}주 → {new_quantity}주, "
+                            f"금액: {original_delta:,.0f}원 → {abs(order.delta_value):,.0f}원)"
+                        )
+                        messages.append(
+                            f"{order.ticker}: 단일주문한도({max_single_order:,.0f}원) 적용"
+                        )
+        
+        # min_order_krw 미만인 주문 제거
+        adjusted_orders = [
+            o for o in adjusted_orders 
+            if o.estimated_quantity > 0 and abs(o.delta_value) >= self.min_order_krw
+        ]
+        
+        # 2. 주문 개수 조정 (max_orders_per_run)
+        if max_orders is not None and len(adjusted_orders) > max_orders:
+            original_count = len(adjusted_orders)
+            # delta_value의 절대값이 큰 순서로 정렬하여 우선순위 부여
+            adjusted_orders.sort(key=lambda o: abs(o.delta_value), reverse=True)
+            adjusted_orders = adjusted_orders[:max_orders]
+            
+            logger.info(
+                f"[Guardrail] 주문 개수 한도 적용: {original_count}개 → {max_orders}개 "
+                f"(가장 큰 delta 기준으로 선택)"
+            )
+            messages.append(f"주문개수한도({max_orders}개) 적용: {original_count}→{max_orders}")
+        
+        # 3. Turnover 조정 (max_turnover_per_run)
+        if max_turnover is not None and adjusted_orders:
             portfolio_value = plan.portfolio_snapshot.total_value
             if portfolio_value > 0:
-                turnover_ratio = plan.total_delta_value / portfolio_value
-                if turnover_ratio > max_turnover:
-                    msg = (
-                        f"Turnover exceeded: "
-                        f"{turnover_ratio:.4f} > {max_turnover:.4f}"
+                current_turnover = sum(abs(o.delta_value) for o in adjusted_orders) / portfolio_value
+                
+                if current_turnover > max_turnover:
+                    # 비례적으로 모든 주문 축소
+                    scale_factor = max_turnover / current_turnover
+                    
+                    logger.info(
+                        f"[Guardrail] Turnover 한도 적용: {current_turnover:.2%} → {max_turnover:.2%} "
+                        f"(scale: {scale_factor:.2%})"
                     )
-                    logger.warning(msg)
-                    return False, msg
+                    
+                    for order in adjusted_orders:
+                        old_qty = order.estimated_quantity
+                        new_quantity = int(order.estimated_quantity * scale_factor)
+                        
+                        if new_quantity > 0:
+                            order.estimated_quantity = new_quantity
+                            order.delta_value = (
+                                new_quantity * order.estimated_price 
+                                if order.action == "buy" 
+                                else -new_quantity * order.estimated_price
+                            )
+                    
+                    messages.append(f"Turnover한도({max_turnover:.0%}) 적용")
         
-        # Order 개수 확인
-        if max_orders is not None:
-            if plan.total_orders > max_orders:
-                msg = (
-                    f"Too many orders: "
-                    f"{plan.total_orders} > {max_orders}"
-                )
-                logger.warning(msg)
-                return False, msg
+        # min_order_krw 미만인 주문 다시 제거 (turnover 조정 후)
+        adjusted_orders = [
+            o for o in adjusted_orders 
+            if o.estimated_quantity > 0 and abs(o.delta_value) >= self.min_order_krw
+        ]
         
-        # 단일 주문 금액 확인
-        if max_single_order is not None:
-            for order in plan.orders:
-                if abs(order.delta_value) > max_single_order:
-                    msg = (
-                        f"Single order exceeded for {order.ticker}: "
-                        f"{abs(order.delta_value):.2f} > {max_single_order}"
-                    )
-                    logger.warning(msg)
-                    return False, msg
+        # 조정된 계획 완성
+        adjusted_plan.orders = adjusted_orders
+        adjusted_plan.total_orders = len(adjusted_orders)
+        adjusted_plan.total_delta_value = sum(abs(o.delta_value) for o in adjusted_orders)
         
-        logger.info("All guardrails passed")
-        return True, "All guardrails passed"
+        # 결과 메시지 생성
+        if messages:
+            final_message = "Guardrails applied: " + "; ".join(messages)
+            logger.info(final_message)
+        else:
+            final_message = "All guardrails passed (no adjustment needed)"
+            logger.info(final_message)
+        
+        # 원본 대비 변화 로깅
+        if plan.total_orders != adjusted_plan.total_orders or plan.total_delta_value != adjusted_plan.total_delta_value:
+            logger.info(
+                f"[Guardrail Summary] "
+                f"주문수: {plan.total_orders} → {adjusted_plan.total_orders}, "
+                f"총거래금액: {plan.total_delta_value:,.0f}원 → {adjusted_plan.total_delta_value:,.0f}원"
+            )
+        
+        return adjusted_plan, final_message
 
 
 # Import after class definition to avoid circular imports

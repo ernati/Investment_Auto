@@ -471,7 +471,7 @@ def test_database_data():
         
         # trading_history 데이터 확인
         try:
-            trading_data = db_manager.get_trading_history("demo_portfolio", "demo", limit=5)
+            trading_data = db_manager.get_trading_history("portfolio-001", "demo", limit=5)
             count = len(trading_data)
             print(f"  📈 거래 기록 (trading_history): {count}건")
             
@@ -492,7 +492,7 @@ def test_database_data():
         
         # rebalancing_logs 데이터 확인  
         try:
-            rebalancing_data = db_manager.get_rebalancing_logs("demo_portfolio", "demo", limit=3)
+            rebalancing_data = db_manager.get_rebalancing_logs("portfolio-001", "demo", limit=3)
             count = len(rebalancing_data)
             print(f"  ⚖️ 리밸런싱 로그 (rebalancing_logs): {count}건")
             
@@ -512,7 +512,7 @@ def test_database_data():
         
         # portfolio_snapshots 데이터 확인
         try:
-            snapshot_data = db_manager.get_portfolio_snapshots("demo_portfolio", "demo", limit=3)
+            snapshot_data = db_manager.get_portfolio_snapshots("portfolio-001", "demo", limit=3)
             count = len(snapshot_data) 
             print(f"  📸 포트폴리오 스냅샷 (portfolio_snapshots): {count}건")
             
@@ -800,5 +800,305 @@ def main():
     print("테스트 완료 - 상세 분석 문서: docs/error_analysis_log_20260304.md")
 
 
+# =============================================================================
+# Upbit 비트코인 테스트 함수들
+# =============================================================================
+
+def test_upbit_price_query():
+    """Upbit 비트코인 현재가 조회 테스트"""
+    print("\n=== Upbit 비트코인 가격 조회 테스트 ===")
+    
+    try:
+        from modules.upbit_api_client import get_upbit_client
+        
+        # Demo 모드로 클라이언트 생성
+        upbit_client = get_upbit_client("demo")
+        
+        # 비트코인 가격 조회
+        price_info = upbit_client.get_bitcoin_price()
+        
+        if price_info.get("success"):
+            trade_price = price_info.get("trade_price", 0)
+            change_rate = price_info.get("change_rate", 0)
+            
+            print(f"✅ 비트코인 현재가 조회 성공")
+            print(f"   현재가: {trade_price:,.0f} KRW")
+            print(f"   변동률: {change_rate*100:.2f}%")
+            return True
+        else:
+            print(f"❌ 비트코인 가격 조회 실패: {price_info.get('error')}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Upbit 가격 조회 테스트 실패: {e}")
+        return False
+
+
+def test_upbit_demo_trading():
+    """Upbit Demo 모드 가상 거래 테스트"""
+    print("\n=== Upbit Demo 모드 가상 거래 테스트 ===")
+    
+    try:
+        from modules.upbit_api_client import get_upbit_client, DemoUpbitCashManager
+        
+        # Demo 모드로 클라이언트 생성
+        upbit_client = get_upbit_client("demo", reload=True)
+        
+        # 1. 초기 잔액 확인
+        print("1️⃣ 초기 계좌 상태 확인...")
+        account_info = upbit_client.get_account_info()
+        
+        if account_info.get("success"):
+            print(f"   KRW 잔액: {account_info.get('krw', 0):,.0f}원")
+            print(f"   BTC 잔액: {account_info.get('btc', 0):.8f}")
+        else:
+            print(f"   ❌ 계좌 조회 실패: {account_info.get('error')}")
+            return False
+        
+        # 2. 비트코인 매수 테스트
+        print("\n2️⃣ 비트코인 가상 매수 테스트 (100,000 KRW)...")
+        buy_result = upbit_client.buy_bitcoin(100000)
+        
+        if buy_result.get("success"):
+            print(f"   ✅ 매수 성공")
+            print(f"   매수 BTC: {buy_result.get('btc_quantity', 0):.8f}")
+            print(f"   매수 가격: {buy_result.get('current_price', 0):,.0f} KRW")
+            print(f"   잔여 KRW: {buy_result.get('remaining_krw', 0):,.0f}")
+        else:
+            print(f"   ❌ 매수 실패: {buy_result.get('error')}")
+            return False
+        
+        # 3. 평가 정보 확인
+        print("\n3️⃣ 포지션 평가 정보 확인...")
+        eval_info = upbit_client.get_btc_evaluation()
+        
+        if eval_info.get("success"):
+            print(f"   KRW 잔액: {eval_info.get('krw_balance', 0):,.0f}원")
+            print(f"   BTC 잔액: {eval_info.get('btc_balance', 0):.8f}")
+            print(f"   BTC 평가액: {eval_info.get('btc_value', 0):,.0f}원")
+            print(f"   총 자산: {eval_info.get('total_value', 0):,.0f}원")
+        
+        # 4. 비트코인 매도 테스트
+        print("\n4️⃣ 비트코인 가상 매도 테스트 (전량)...")
+        sell_result = upbit_client.sell_bitcoin()  # 전량 매도
+        
+        if sell_result.get("success"):
+            print(f"   ✅ 매도 성공")
+            print(f"   매도 BTC: {sell_result.get('btc_quantity', 0):.8f}")
+            print(f"   수령 KRW: {sell_result.get('krw_received', 0):,.0f}")
+            print(f"   손익: {sell_result.get('pnl', 0):+,.0f} KRW")
+        else:
+            print(f"   ❌ 매도 실패: {sell_result.get('error')}")
+            return False
+        
+        # 5. 최종 잔액 확인
+        print("\n5️⃣ 최종 계좌 상태 확인...")
+        final_info = upbit_client.get_account_info()
+        
+        if final_info.get("success"):
+            print(f"   KRW 잔액: {final_info.get('krw', 0):,.0f}원")
+            print(f"   BTC 잔액: {final_info.get('btc', 0):.8f}")
+        
+        print("\n✅ Upbit Demo 거래 테스트 완료")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Upbit Demo 거래 테스트 실패: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def test_unified_portfolio_fetcher():
+    """통합 포트폴리오 페처 테스트 (KIS + Upbit)"""
+    print("\n=== 통합 포트폴리오 페처 테스트 ===")
+    
+    try:
+        from modules.config_loader import get_config
+        from modules.kis_auth import KISAuth
+        from modules.unified_portfolio_fetcher import create_unified_fetcher
+        
+        # KIS 인증 설정
+        config = get_config()
+        demo_config = config.get_kis_config("demo")
+        
+        kis_auth = KISAuth(
+            appkey=demo_config["appkey"],
+            appsecret=demo_config["appsecret"],
+            account=demo_config["account"],
+            product=demo_config["product"],
+            htsid=demo_config["htsid"],
+            env="demo"
+        )
+        
+        # 통합 페처 생성
+        unified_fetcher = create_unified_fetcher(kis_auth, "demo")
+        print("✅ 통합 포트폴리오 페처 초기화 성공")
+        
+        # 통합 스냅샷 조회
+        print("\n📊 통합 포트폴리오 스냅샷 조회...")
+        
+        # target_weights에 있는 모든 티커 포함 (bitcoin 포함)
+        all_tickers = ["005930", "000660", "035420", "bitcoin"]
+        
+        snapshot = unified_fetcher.fetch_unified_portfolio_snapshot(
+            portfolio_id="test-portfolio",
+            price_source="last",
+            extra_tickers=all_tickers
+        )
+        
+        print(f"\n📋 스냅샷 결과:")
+        print(f"   포트폴리오 ID: {snapshot.portfolio_id}")
+        print(f"   총 현금 (KIS + Upbit): {snapshot.cash:,.0f}원")
+        print(f"   주식/코인 평가액: {snapshot.stocks_value:,.0f}원")
+        print(f"   총 자산: {snapshot.total_value:,.0f}원")
+        print(f"   포지션 수: {len(snapshot.positions)}")
+        
+        # 포지션 상세
+        if snapshot.positions:
+            print(f"\n   📈 보유 포지션:")
+            for ticker, position in snapshot.positions.items():
+                weight = snapshot.get_current_weight(ticker)
+                print(f"      {ticker}: {position.evaluation:,.0f}원 ({weight*100:.2f}%)")
+        
+        print("\n✅ 통합 포트폴리오 페처 테스트 완료")
+        return True
+        
+    except Exception as e:
+        print(f"❌ 통합 포트폴리오 페처 테스트 실패: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def test_bitcoin_rebalancing_order():
+    """비트코인 리밸런싱 주문 생성 테스트"""
+    print("\n=== 비트코인 리밸런싱 주문 생성 테스트 ===")
+    
+    try:
+        from modules.config_loader import get_portfolio_config
+        from modules.rebalancing_engine import RebalancingEngine
+        from modules.portfolio_models import PortfolioSnapshot, PositionSnapshot
+        
+        # 설정 로더
+        config = get_portfolio_config(reload=True)
+        
+        # 리밸런싱 엔진 초기화
+        engine = RebalancingEngine(config)
+        print("✅ 리밸런싱 엔진 초기화 성공")
+        
+        # target_weights 확인
+        target_weights = config.get_basic("target_weights", {})
+        print(f"\n📋 목표 비중:")
+        for category, assets in target_weights.items():
+            if isinstance(assets, dict):
+                print(f"   [{category}]")
+                for ticker, weight in assets.items():
+                    print(f"      {ticker}: {weight*100:.1f}%")
+        
+        # 테스트용 포트폴리오 스냅샷 생성
+        print("\n🧪 테스트 포트폴리오 스냅샷 생성...")
+        
+        test_snapshot = PortfolioSnapshot(
+            portfolio_id="test-portfolio",
+            cash=5000000  # 500만원 현금
+        )
+        
+        # 주식 포지션 추가
+        test_snapshot.add_position("005930", 10, 75000)  # 삼성전자 10주
+        test_snapshot.add_position("000660", 5, 120000)  # SK하이닉스 5주
+        test_snapshot.add_position("035420", 3, 350000)  # NAVER 3주
+        
+        # 비트코인 포지션 추가 (300만원 상당)
+        btc_price = 95000000  # 비트코인 가격 9500만원
+        test_snapshot.positions["bitcoin"] = PositionSnapshot(
+            ticker="bitcoin",
+            quantity=1,
+            price=btc_price
+        )
+        test_snapshot.positions["bitcoin"].evaluation = 3000000  # 300만원 상당
+        test_snapshot._recalculate()
+        
+        print(f"   총 자산: {test_snapshot.total_value:,.0f}원")
+        print(f"   현금: {test_snapshot.cash:,.0f}원")
+        print(f"   포지션: {len(test_snapshot.positions)}개")
+        
+        # 리밸런싱 계획 생성
+        print("\n📊 리밸런싱 계획 생성...")
+        plan = engine.create_rebalance_plan(test_snapshot, is_calendar_triggered=True)
+        
+        print(f"\n   리밸런싱 필요: {'예' if plan.should_rebalance else '아니오'}")
+        print(f"   사유: {plan.rebalance_reason}")
+        print(f"   총 주문 수: {plan.total_orders}")
+        
+        if plan.orders:
+            print(f"\n   📋 주문 목록:")
+            for order in plan.orders:
+                order_type = "매수" if order.action == "buy" else "매도"
+                print(f"      {order.ticker}: {order_type} {abs(order.delta_value):,.0f}원")
+                
+                # 비트코인 주문 확인
+                if order.ticker == "bitcoin":
+                    print(f"         → 비트코인 주문 확인됨!")
+        
+        print("\n✅ 비트코인 리밸런싱 주문 생성 테스트 완료")
+        return True
+        
+    except Exception as e:
+        print(f"❌ 비트코인 리밸런싱 주문 생성 테스트 실패: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def run_upbit_tests():
+    """Upbit 관련 모든 테스트 실행"""
+    print("\n" + "="*60)
+    print("🪙 Upbit 비트코인 통합 테스트 시작")
+    print("="*60)
+    
+    test_results = []
+    
+    # 1. 가격 조회 테스트
+    test_results.append(("비트코인 가격 조회", test_upbit_price_query()))
+    
+    # 2. Demo 거래 테스트
+    test_results.append(("Demo 가상 거래", test_upbit_demo_trading()))
+    
+    # 3. 통합 포트폴리오 페처 테스트
+    test_results.append(("통합 포트폴리오 페처", test_unified_portfolio_fetcher()))
+    
+    # 4. 비트코인 리밸런싱 테스트
+    test_results.append(("비트코인 리밸런싱 주문", test_bitcoin_rebalancing_order()))
+    
+    # 결과 요약
+    print(f"\n{'='*20} Upbit 테스트 결과 요약 {'='*20}")
+    passed_tests = 0
+    for test_name, result in test_results:
+        status = "✅ 통과" if result else "❌ 실패"
+        print(f"{test_name:25} : {status}")
+        if result:
+            passed_tests += 1
+    
+    print(f"\n총 {len(test_results)}개 테스트 중 {passed_tests}개 통과")
+    
+    if passed_tests == len(test_results):
+        print("\n🎉 모든 Upbit 테스트 통과!")
+        print("   비트코인 포트폴리오 리밸런싱 기능 준비 완료")
+    else:
+        print(f"\n⚠️ {len(test_results) - passed_tests}개 테스트 실패")
+    
+    return passed_tests == len(test_results)
+
+
 if __name__ == "__main__":
-    main()
+    import sys
+    
+    # 명령줄 인자에 따라 테스트 선택
+    if len(sys.argv) > 1 and sys.argv[1] == "--upbit":
+        run_upbit_tests()
+    else:
+        main()
+        print("\n" + "-"*60)
+        print("💡 Upbit 테스트만 실행하려면: python kis_debug.py --upbit")
+        print("-"*60)
