@@ -399,6 +399,50 @@ False   # 실행 시간 아니거나 에러 발생
 # (run_scheduler()는 초기 설정을 캐시함)
 ```
 
+---
+
+## 변경 이력
+
+### 2026-03-10: DB 저장 에러 수정
+
+**문제 1**: `Object of type PositionSnapshot is not JSON serializable`
+- **원인**: `portfolio_snapshot.positions`가 `Dict[str, PositionSnapshot]` 타입인데, PositionSnapshot 객체를 직접 `json.dumps()`에 전달
+- **해결**: `_save_to_database`에서 각 position을 `to_dict()`로 변환
+
+**문제 2**: `'dict' object has no attribute 'symbol'`
+- **원인**: `ExecutionResult.executed_orders`는 `List[Dict]` 타입인데, `order.symbol`로 속성 접근 시도
+- **해결**: dict 및 객체 모두 지원하는 안전한 접근 방식으로 변경
+
+**수정된 코드** (`_save_to_database` 메서드):
+```python
+# positions 데이터 안전하게 변환
+positions_data = {}
+for ticker, position in portfolio_snapshot.positions.items():
+    if hasattr(position, 'to_dict'):
+        positions_data[ticker] = position.to_dict()
+    elif isinstance(position, dict):
+        positions_data[ticker] = position
+    else:
+        positions_data[ticker] = {
+            "ticker": getattr(position, 'ticker', ticker),
+            # ...
+        }
+
+# 거래 기록 저장 - dict/객체 모두 지원
+for order in result.executed_orders:
+    symbol = order.get('symbol') if isinstance(order, dict) else getattr(order, 'symbol', '')
+    # ...
+```
+
+**테스트 방법**:
+```bash
+# kis_debug.py의 test_database_data() 함수 실행
+python Scripts/tests/kis_debug.py
+
+# 리밸런싱 실행 후 DB 저장 에러 없음 확인
+python Scripts/apps/portfolio_rebalancing.py --mode once --skip-schedule-check
+```
+
 ### 3. Dry-run 모드
 ```bash
 # ❌ 개발 중: 절대 dry_run=false로 테스트 금지

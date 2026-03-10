@@ -319,10 +319,21 @@ class PortfolioRebalancingApp:
         try:
             env = self.kis_auth.env
             
-            # positions 데이터 안전하게 변환 (dict가 아닐 경우 대비)
-            positions_data = portfolio_snapshot.positions
-            if not isinstance(positions_data, dict):
-                positions_data = positions_data.to_dict() if hasattr(positions_data, 'to_dict') else {}
+            # positions 데이터 안전하게 변환 (PositionSnapshot 객체들을 dict로 변환)
+            positions_data = {}
+            for ticker, position in portfolio_snapshot.positions.items():
+                if hasattr(position, 'to_dict'):
+                    positions_data[ticker] = position.to_dict()
+                elif isinstance(position, dict):
+                    positions_data[ticker] = position
+                else:
+                    # fallback: 기본 속성들 추출
+                    positions_data[ticker] = {
+                        "ticker": getattr(position, 'ticker', ticker),
+                        "quantity": getattr(position, 'quantity', 0),
+                        "price": getattr(position, 'price', 0),
+                        "evaluation": getattr(position, 'evaluation', 0)
+                    }
             
             # 포트폴리오 스냅샷 저장
             snapshot_record = PortfolioSnapshotRecord(
@@ -333,17 +344,24 @@ class PortfolioRebalancingApp:
             )
             self.db_manager.save_portfolio_snapshot(snapshot_record)
             
-            # 거래 기록 저장
+            # 거래 기록 저장 (executed_orders는 List[Dict] 타입)
             for order in result.executed_orders:
+                # dict 또는 객체 모두 지원
+                symbol = order.get('symbol') if isinstance(order, dict) else getattr(order, 'symbol', '')
+                side = order.get('side') if isinstance(order, dict) else getattr(order, 'side', 'buy')
+                quantity = order.get('quantity', 0) if isinstance(order, dict) else getattr(order, 'quantity', 0)
+                price = order.get('price', 0) if isinstance(order, dict) else getattr(order, 'price', 0)
+                order_id = order.get('order_id', '') if isinstance(order, dict) else getattr(order, 'order_id', '')
+                
                 trading_record = TradingHistoryRecord(
                     portfolio_id=portfolio_snapshot.portfolio_id,
-                    symbol=order.symbol,
-                    order_type='buy' if order.side == 'buy' else 'sell',
-                    quantity=float(order.quantity),
-                    price=float(order.price if order.price else 0),
-                    total_amount=float(order.quantity * (order.price or 0)),
+                    symbol=symbol,
+                    order_type='buy' if side == 'buy' else 'sell',
+                    quantity=float(quantity) if quantity else 0.0,
+                    price=float(price) if price else 0.0,
+                    total_amount=float(quantity * price) if quantity and price else 0.0,
                     commission=0.0,  # 수수료 정보가 있다면 추가
-                    order_id=order.order_id or '',
+                    order_id=str(order_id) if order_id else '',
                     status='completed',
                     environment=env
                 )

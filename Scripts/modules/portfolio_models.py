@@ -28,6 +28,15 @@ class PositionSnapshot:
     
     def __post_init__(self):
         self.evaluation = self.quantity * self.price
+    
+    def to_dict(self) -> Dict:
+        """JSON 직렬화 가능한 딕셔너리로 변환"""
+        return {
+            "ticker": self.ticker,
+            "quantity": self.quantity,
+            "price": self.price,
+            "evaluation": self.evaluation
+        }
 
 
 @dataclass

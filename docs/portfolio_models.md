@@ -291,3 +291,32 @@ def process_snapshot(snapshot: PortfolioSnapshot) -> RebalancePlan:
     # IDE가 snapshot의 메서드와 속성을 자동완성
     ...
 ```
+
+---
+
+## 변경 이력
+
+### 2026-03-10: PositionSnapshot JSON 직렬화 지원 추가
+
+**문제**: DB 저장 시 `Object of type PositionSnapshot is not JSON serializable` 에러 발생
+
+**원인**: `PortfolioSnapshot.positions`가 `Dict[str, PositionSnapshot]` 타입인데, `PositionSnapshot` dataclass에 JSON 직렬화 메서드가 없었음
+
+**해결**: `PositionSnapshot`에 `to_dict()` 메서드 추가
+
+```python
+@dataclass
+class PositionSnapshot:
+    # ... 기존 필드들 ...
+    
+    def to_dict(self) -> Dict:
+        """객체를 JSON 직렬화 가능한 dict로 변환"""
+        return {
+            "ticker": self.ticker,
+            "quantity": self.quantity,
+            "price": self.price,
+            "evaluation": self.evaluation
+        }
+```
+
+**영향**: 이제 `PositionSnapshot` 객체를 DB에 저장할 때 정상적으로 JSON으로 변환됨
