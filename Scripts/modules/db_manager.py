@@ -310,18 +310,45 @@ class DatabaseManager:
             logger.error(f"Failed to save system log: {e}")
             return False
     
-    def get_trading_history(self, portfolio_id: str, environment: str, 
+    def get_trading_history(self, portfolio_id: Optional[str] = None, 
+                           environment: Optional[str] = None, 
                            limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
-        """거래 기록 조회"""
+        """
+        거래 기록 조회
+        
+        Args:
+            portfolio_id: 포트폴리오 ID (None 또는 'all'이면 전체 조회)
+            environment: 환경 (None 또는 'all'이면 전체 조회)
+            limit: 최대 조회 개수
+            offset: 시작 위치
+        """
         try:
             with self.get_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    cur.execute("""
+                    # 동적 WHERE 조건 생성
+                    conditions = []
+                    params = []
+                    
+                    if portfolio_id and portfolio_id != 'all':
+                        conditions.append("portfolio_id = %s")
+                        params.append(portfolio_id)
+                    
+                    if environment and environment != 'all':
+                        conditions.append("environment = %s")
+                        params.append(environment)
+                    
+                    where_clause = ""
+                    if conditions:
+                        where_clause = "WHERE " + " AND ".join(conditions)
+                    
+                    params.extend([limit, offset])
+                    
+                    cur.execute(f"""
                         SELECT * FROM trading_history 
-                        WHERE portfolio_id = %s AND environment = %s
+                        {where_clause}
                         ORDER BY timestamp DESC
                         LIMIT %s OFFSET %s
-                    """, (portfolio_id, environment, limit, offset))
+                    """, params)
                     
                     return [dict(record) for record in cur.fetchall()]
         
@@ -329,18 +356,45 @@ class DatabaseManager:
             logger.error(f"Failed to get trading history: {e}")
             return []
     
-    def get_rebalancing_logs(self, portfolio_id: str, environment: str,
+    def get_rebalancing_logs(self, portfolio_id: Optional[str] = None, 
+                           environment: Optional[str] = None,
                            limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
-        """리밸런싱 로그 조회"""
+        """
+        리밸런싱 로그 조회
+        
+        Args:
+            portfolio_id: 포트폴리오 ID (None 또는 'all'이면 전체 조회)
+            environment: 환경 (None 또는 'all'이면 전체 조회)
+            limit: 최대 조회 개수
+            offset: 시작 위치
+        """
         try:
             with self.get_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    cur.execute("""
+                    # 동적 WHERE 조건 생성
+                    conditions = []
+                    params = []
+                    
+                    if portfolio_id and portfolio_id != 'all':
+                        conditions.append("portfolio_id = %s")
+                        params.append(portfolio_id)
+                    
+                    if environment and environment != 'all':
+                        conditions.append("environment = %s")
+                        params.append(environment)
+                    
+                    where_clause = ""
+                    if conditions:
+                        where_clause = "WHERE " + " AND ".join(conditions)
+                    
+                    params.extend([limit, offset])
+                    
+                    cur.execute(f"""
                         SELECT * FROM rebalancing_logs 
-                        WHERE portfolio_id = %s AND environment = %s
+                        {where_clause}
                         ORDER BY timestamp DESC
                         LIMIT %s OFFSET %s
-                    """, (portfolio_id, environment, limit, offset))
+                    """, params)
                     
                     return [dict(record) for record in cur.fetchall()]
         
@@ -348,18 +402,45 @@ class DatabaseManager:
             logger.error(f"Failed to get rebalancing logs: {e}")
             return []
     
-    def get_portfolio_snapshots(self, portfolio_id: str, environment: str,
+    def get_portfolio_snapshots(self, portfolio_id: Optional[str] = None, 
+                              environment: Optional[str] = None,
                               limit: int = 30, offset: int = 0) -> List[Dict[str, Any]]:
-        """포트폴리오 스냅샷 조회"""
+        """
+        포트폴리오 스냅샷 조회
+        
+        Args:
+            portfolio_id: 포트폴리오 ID (None 또는 'all'이면 전체 조회)
+            environment: 환경 (None 또는 'all'이면 전체 조회)
+            limit: 최대 조회 개수
+            offset: 시작 위치
+        """
         try:
             with self.get_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    cur.execute("""
+                    # 동적 WHERE 조건 생성
+                    conditions = []
+                    params = []
+                    
+                    if portfolio_id and portfolio_id != 'all':
+                        conditions.append("portfolio_id = %s")
+                        params.append(portfolio_id)
+                    
+                    if environment and environment != 'all':
+                        conditions.append("environment = %s")
+                        params.append(environment)
+                    
+                    where_clause = ""
+                    if conditions:
+                        where_clause = "WHERE " + " AND ".join(conditions)
+                    
+                    params.extend([limit, offset])
+                    
+                    cur.execute(f"""
                         SELECT * FROM portfolio_snapshots 
-                        WHERE portfolio_id = %s AND environment = %s
+                        {where_clause}
                         ORDER BY timestamp DESC
                         LIMIT %s OFFSET %s
-                    """, (portfolio_id, environment, limit, offset))
+                    """, params)
                     
                     return [dict(record) for record in cur.fetchall()]
         

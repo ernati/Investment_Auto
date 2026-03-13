@@ -117,10 +117,18 @@ class PortfolioWebServer:
         
         @self.app.route('/api/db/trading-history')
         def get_trading_history_api():
-            """거래 기록 조회 API"""
+            """
+            거래 기록 조회 API
+            
+            Query Parameters:
+                portfolio_id: 포트폴리오 ID ('all'이면 전체 조회, 기본값: 'all')
+                environment: 환경 ('all'이면 전체 조회, 기본값: 'all')
+                limit: 최대 조회 개수 (기본값: 50)
+                offset: 시작 위치 (기본값: 0)
+            """
             try:
-                portfolio_id = request.args.get('portfolio_id', 'default')
-                environment = request.args.get('environment', self.env)
+                portfolio_id = request.args.get('portfolio_id', 'all')
+                environment = request.args.get('environment', 'all')
                 limit = int(request.args.get('limit', 50))
                 offset = int(request.args.get('offset', 0))
                 
@@ -142,10 +150,18 @@ class PortfolioWebServer:
         
         @self.app.route('/api/db/rebalancing-logs')
         def get_rebalancing_logs_api():
-            """리밸런싱 로그 조회 API"""
+            """
+            리밸런싱 로그 조회 API
+            
+            Query Parameters:
+                portfolio_id: 포트폴리오 ID ('all'이면 전체 조회, 기본값: 'all')
+                environment: 환경 ('all'이면 전체 조회, 기본값: 'all')
+                limit: 최대 조회 개수 (기본값: 30)
+                offset: 시작 위치 (기본값: 0)
+            """
             try:
-                portfolio_id = request.args.get('portfolio_id', 'default')
-                environment = request.args.get('environment', self.env)
+                portfolio_id = request.args.get('portfolio_id', 'all')
+                environment = request.args.get('environment', 'all')
                 limit = int(request.args.get('limit', 30))
                 offset = int(request.args.get('offset', 0))
                 
@@ -167,10 +183,18 @@ class PortfolioWebServer:
         
         @self.app.route('/api/db/portfolio-snapshots')
         def get_portfolio_snapshots_api():
-            """포트폴리오 스냅샷 조회 API"""
+            """
+            포트폴리오 스냅샷 조회 API
+            
+            Query Parameters:
+                portfolio_id: 포트폴리오 ID ('all'이면 전체 조회, 기본값: 'all')
+                environment: 환경 ('all'이면 전체 조회, 기본값: 'all')
+                limit: 최대 조회 개수 (기본값: 30)
+                offset: 시작 위치 (기본값: 0)
+            """
             try:
-                portfolio_id = request.args.get('portfolio_id', 'default')
-                environment = request.args.get('environment', self.env)
+                portfolio_id = request.args.get('portfolio_id', 'all')
+                environment = request.args.get('environment', 'all')
                 limit = int(request.args.get('limit', 30))
                 offset = int(request.args.get('offset', 0))
                 
