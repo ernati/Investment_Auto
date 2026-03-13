@@ -121,6 +121,10 @@ class RebalancePlan:
     # 주문 계획
     orders: List[RebalanceOrder] = field(default_factory=list)
     
+    # 비중 정보 (로그 저장용)
+    target_weights: Dict[str, float] = field(default_factory=dict)   # 목표 비중
+    current_weights: Dict[str, float] = field(default_factory=dict)  # 현재 비중
+    
     # 통계
     total_delta_value: float = 0.0  # 총 변화 금액
     total_orders: int = 0           # 총 주문 수

@@ -84,6 +84,10 @@ class RebalancingEngine:
             portfolio_snapshot=portfolio_snapshot
         )
         
+        # 비중 정보 저장 (로그용)
+        plan.target_weights = dict(self.target_weights)  # 목표 비중
+        plan.current_weights = portfolio_snapshot.get_current_weights()  # 현재 비중
+        
         # 1. 리밸런싱 필요 여부 판단
         should_rebalance, reason = self._should_rebalance(
             portfolio_snapshot, is_calendar_triggered

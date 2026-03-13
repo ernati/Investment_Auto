@@ -381,22 +381,30 @@ class PortfolioRebalancingApp:
             # plan 객체에서 weights 데이터 안전하게 추출
             target_weights = getattr(plan, 'target_weights', None) or {}
             current_weights = getattr(plan, 'current_weights', None) or {}
-            new_weights = getattr(plan, 'new_weights', None) or {}
             
             # dict가 아닌 경우 변환 시도
             if not isinstance(target_weights, dict):
                 target_weights = target_weights.to_dict() if hasattr(target_weights, 'to_dict') else {}
             if not isinstance(current_weights, dict):
                 current_weights = current_weights.to_dict() if hasattr(current_weights, 'to_dict') else {}
-            if not isinstance(new_weights, dict):
-                new_weights = new_weights.to_dict() if hasattr(new_weights, 'to_dict') else {}
+            
+            # after_weights: 실행 후 포트폴리오 스냅샷에서 계산
+            after_weights = {}
+            if result.succeeded and result.post_portfolio_snapshot:
+                after_weights = result.post_portfolio_snapshot.get_current_weights()
+            elif result.succeeded:
+                # 스냅샷이 없으면 current_weights 사용 (변화 없음 가정)
+                after_weights = current_weights
+            
+            # 상세한 리밸런싱 사유 생성
+            detailed_reason = self._create_detailed_reason(plan, current_weights, target_weights)
             
             rebalancing_record = RebalancingLogRecord(
                 portfolio_id=portfolio_id,
-                rebalance_reason=plan.rebalance_reason or 'Unknown',
+                rebalance_reason=detailed_reason,
                 target_weights=target_weights,
                 before_weights=current_weights,
-                after_weights=new_weights,
+                after_weights=after_weights,
                 orders_executed=len(result.executed_orders) if result.succeeded else 0,
                 status='success' if result.succeeded else 'failed',
                 error_message=result.error_message if not result.succeeded else None,
@@ -406,6 +414,31 @@ class PortfolioRebalancingApp:
         
         except Exception as e:
             logger.error(f"Failed to save rebalancing log: {e}")
+    
+    def _create_detailed_reason(self, plan, current_weights, target_weights) -> str:
+        """상세한 리밸런싱 사유 생성"""
+        reason = plan.rebalance_reason or "Unknown"
+        
+        # Band breach인 경우 어떤 종목이 벗어났는지 상세 정보 추가
+        if "Band breach" in reason or "BAND" in reason:
+            deviations = []
+            band_value = self.rebalancing_engine.band_value
+            
+            for ticker, target_weight in target_weights.items():
+                current_weight = current_weights.get(ticker, 0)
+                deviation = current_weight - target_weight
+                
+                # 밴드 초과 여부 확인
+                if abs(deviation) > band_value:
+                    direction = "초과" if deviation > 0 else "미달"
+                    deviations.append(
+                        f"{ticker}: {current_weight*100:.1f}% (목표 {target_weight*100:.1f}%, {direction} {abs(deviation)*100:.1f}%p)"
+                    )
+            
+            if deviations:
+                reason = f"Band breach - {', '.join(deviations)}"
+        
+        return reason
 
 
 def main():
