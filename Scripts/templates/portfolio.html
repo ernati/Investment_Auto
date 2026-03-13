@@ -434,7 +434,7 @@
             <div id="trading-history" class="tab-content active">
                 <div class="filter-section">
                     <label>포트폴리오 ID:</label>
-                    <input type="text" id="trading-portfolio-filter" value="portfolio-001" placeholder="포트폴리오 ID">
+                    <input type="text" id="trading-portfolio-filter" value="" placeholder="전체 (빈칸=전체)">
                     <label>주문 유형:</label>
                     <select id="trading-order-type-filter">
                         <option value="">전체</option>
@@ -463,7 +463,7 @@
             <div id="rebalancing-logs" class="tab-content">
                 <div class="filter-section">
                     <label>포트폴리오 ID:</label>
-                    <input type="text" id="rebalancing-portfolio-filter" value="portfolio-001" placeholder="포트폴리오 ID">
+                    <input type="text" id="rebalancing-portfolio-filter" value="" placeholder="전체 (빈칸=전체)">
                     <label>상태:</label>
                     <select id="rebalancing-status-filter">
                         <option value="">전체</option>
@@ -486,7 +486,7 @@
             <div id="portfolio-snapshots" class="tab-content">
                 <div class="filter-section">
                     <label>포트폴리오 ID:</label>
-                    <input type="text" id="snapshots-portfolio-filter" value="portfolio-001" placeholder="포트폴리오 ID">
+                    <input type="text" id="snapshots-portfolio-filter" value="" placeholder="전체 (빈칸=전체)">
                     <button class="refresh-btn" onclick="applySnapshotsFilters()">필터 적용</button>
                     <button class="refresh-btn" onclick="resetSnapshotsFilters()" style="background-color: #6c757d; margin-left: 0.5rem;">리셋</button>
                 </div>
@@ -624,11 +624,12 @@
         // DB 요약 정보 로드
         async function loadDbSummary() {
             try {
+                // portfolio_id=all로 전체 데이터 조회
                 const [trading, rebalancing, snapshots, systemLogs] = await Promise.all([
-                    fetch('/api/db/trading-history?limit=100&portfolio_id=demo_portfolio'),
-                    fetch('/api/db/rebalancing-logs?limit=100&portfolio_id=demo_portfolio'),
-                    fetch('/api/db/portfolio-snapshots?limit=100&portfolio_id=demo_portfolio'),
-                    fetch('/api/db/system-logs?limit=100')
+                    fetch('/api/db/trading-history?limit=1000'),
+                    fetch('/api/db/rebalancing-logs?limit=1000'),
+                    fetch('/api/db/portfolio-snapshots?limit=1000'),
+                    fetch('/api/db/system-logs?limit=1000')
                 ]);
                 
                 const tradingData = await trading.json();
@@ -675,17 +676,14 @@
                 const pageData = dbPageData[tabName];
                 const offset = pageData.page * pageData.limit;
                 
-                // URL 파라미터 구성
+                // URL 파라미터 구성 (전체 조회가 기본)
                 const params = new URLSearchParams({
                     limit: pageData.limit,
-                    offset: offset,
-                    environment: '{{ env }}'
+                    offset: offset
                 });
                 
-                // 기본 포트폴리오 ID 설정 (거래 기록, 리밸런싱, 스냅샷용)
-                if (tabName === 'trading-history' || tabName === 'rebalancing-logs' || tabName === 'portfolio-snapshots') {
-                    params.append('portfolio_id', 'demo_portfolio');
-                }
+                // 필터에서 portfolio_id가 지정된 경우만 추가 (빈 값이면 전체 조회)
+                // 기본값 'all'은 서버에서 전체 조회로 처리됨
                 
                 // 필터 추가 (값이 있는 경우만)
                 Object.keys(pageData.filters).forEach(key => {
