@@ -162,7 +162,12 @@ class KISTrading:
                     'order_no': output.get('ODNO', ''),  # 주문번호
                     'order_time': output.get('ORD_TMD', ''),  # 주문시각
                     'message': response.get('msg1', '주문이 정상적으로 처리되었습니다.'),
-                    'data': response
+                    'data': response,
+                    # DB 저장용 필드 추가
+                    'symbol': stock_code,
+                    'side': order_type,
+                    'quantity': quantity,
+                    'price': 0  # 체결가 확인 후 업데이트
                 }
                 
                 # 모의투자 환경에서만 주문 성공 시 가상 현금 잔액 업데이트
@@ -189,6 +194,7 @@ class KISTrading:
                         
                         if executed_price is not None:
                             executed_quantity = quantity  # 일반적으로 주문수량과 동일
+                            result['price'] = executed_price  # 체결가격 업데이트
                             
                             if order_type == "buy":
                                 # 매수: 현금 차감
