@@ -87,7 +87,7 @@ class ConfigValidator:
             return
             
         # 지원되는 자산 카테고리
-        supported_categories = ['stocks', 'bonds', 'etfs', 'reits', 'commodities', 'crypto']
+        supported_categories = ['stocks', 'overseas_stocks', 'bonds', 'etfs', 'reits', 'commodities', 'crypto']
         
         total_weight = 0.0
         category_weights = {}
@@ -116,7 +116,17 @@ class ConfigValidator:
             
             # 각 자산별 비중 검증
             for ticker, weight in assets.items():
-                if not isinstance(weight, (int, float)):
+                # overseas_stocks의 경우 weight가 dict 형태 ({"exchange": "AMEX", "weight": 0.4})
+                if isinstance(weight, dict):
+                    actual_weight = weight.get("weight", 0)
+                    if not isinstance(actual_weight, (int, float)):
+                        self.errors.append(
+                            f"BASIC:/target_weights/{category}/{ticker}: "
+                            f"Weight must be a number, got {type(actual_weight).__name__}"
+                        )
+                        continue
+                    weight = actual_weight
+                elif not isinstance(weight, (int, float)):
                     self.errors.append(
                         f"BASIC:/target_weights/{category}/{ticker}: "
                         f"Weight must be a number, got {type(weight).__name__}"
