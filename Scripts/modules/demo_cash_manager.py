@@ -43,16 +43,26 @@ class DemoCashManager:
                 "upbit_krw_balance": 2000000,  # Upbit 초기 200만원
                 "upbit_btc_balance": 0.0,  # Upbit 초기 BTC 0
                 "upbit_avg_buy_price": 0.0,  # Upbit BTC 평균 매수가
+                "overseas_balances": {  # 해외주식 외화 잔고
+                    "USD": {"balance": 10000.00, "avg_exchange_rate": 0.0},
+                    "JPY": {"balance": 500000, "avg_exchange_rate": 0.0},
+                    "HKD": {"balance": 50000.00, "avg_exchange_rate": 0.0},
+                    "CNY": {"balance": 10000.00, "avg_exchange_rate": 0.0},
+                    "VND": {"balance": 50000000, "avg_exchange_rate": 0.0}
+                },
+                "overseas_holdings": {},  # 해외주식 보유 현황
                 "created_at": datetime.now().isoformat(),
                 "updated_at": datetime.now().isoformat(),
                 "transaction_history": [],
-                "upbit_transaction_history": []
+                "upbit_transaction_history": [],
+                "overseas_transaction_history": []
             }
             self._save_data(initial_data)
             logger.info(f"초기 계좌 현금 잔액 설정: {initial_data['cash_balance']:,}원 (계좌: {self.account})")
             logger.info(f"초기 Upbit 잔액 설정: KRW={initial_data['upbit_krw_balance']:,}원, BTC={initial_data['upbit_btc_balance']}")
+            logger.info(f"초기 해외 외화 잔고 설정: USD={initial_data['overseas_balances']['USD']['balance']:,.2f}")
         else:
-            # 기존 파일에 Upbit 필드가 없으면 추가
+            # 기존 파일에 필수 필드가 없으면 추가
             data = self._load_data()
             updated = False
             
@@ -69,9 +79,27 @@ class DemoCashManager:
                 data["upbit_transaction_history"] = []
                 updated = True
             
+            # 해외주식 필드 추가
+            if "overseas_balances" not in data:
+                data["overseas_balances"] = {
+                    "USD": {"balance": 10000.00, "avg_exchange_rate": 0.0},
+                    "JPY": {"balance": 500000, "avg_exchange_rate": 0.0},
+                    "HKD": {"balance": 50000.00, "avg_exchange_rate": 0.0},
+                    "CNY": {"balance": 10000.00, "avg_exchange_rate": 0.0},
+                    "VND": {"balance": 50000000, "avg_exchange_rate": 0.0}
+                }
+                updated = True
+                logger.info(f"기존 cash 파일에 해외 외화 잔고 필드 추가됨")
+            if "overseas_holdings" not in data:
+                data["overseas_holdings"] = {}
+                updated = True
+            if "overseas_transaction_history" not in data:
+                data["overseas_transaction_history"] = []
+                updated = True
+            
             if updated:
                 self._save_data(data)
-                logger.info(f"기존 cash 파일에 Upbit 필드 추가됨")
+                logger.info(f"기존 cash 파일 필드 업데이트 완료")
     
     def _load_data(self) -> Dict[str, Any]:
         """현금 데이터를 로드합니다."""
@@ -488,3 +516,349 @@ def get_demo_upbit_cash_manager(account: str) -> DemoUpbitCashManager:
         DemoUpbitCashManager: Upbit 가상 현금 관리자 인스턴스
     """
     return DemoUpbitCashManager(account)
+
+
+# 해외주식 통화별 초기 잔고 (USD 기준)
+OVERSEAS_INITIAL_BALANCES = {
+    "USD": 10000.00,   # 미국 달러 $10,000
+    "JPY": 500000,     # 일본 엔 ¥500,000
+    "HKD": 50000.00,   # 홍콩 달러 HK$50,000
+    "CNY": 10000.00,   # 중국 위안 ¥10,000
+    "VND": 50000000,   # 베트남 동 50,000,000 VND
+}
+
+# 거래소 코드별 통화 매핑
+EXCHANGE_CURRENCY_MAP = {
+    "NASD": "USD", "NYSE": "USD", "AMEX": "USD", "NAS": "USD",
+    "SEHK": "HKD",
+    "SHAA": "CNY", "SZAA": "CNY",
+    "TKSE": "JPY",
+    "HASE": "VND", "VNSE": "VND",
+}
+
+
+class DemoOverseasCashManager:
+    """
+    데모 모드용 해외주식 외화 잔고 관리 클래스
+    DemoCashManager와 동일한 파일을 사용하여 영속성 제공
+    """
+    
+    def __init__(self, account: str):
+        """
+        Args:
+            account (str): 계좌번호 (KIS 계좌와 동일)
+        """
+        self.account = account
+        self._cash_manager = get_demo_cash_manager(account)
+        self._ensure_overseas_fields()
+        
+        logger.info(f"DemoOverseasCashManager 초기화 (계좌: {account})")
+    
+    def _ensure_overseas_fields(self):
+        """해외주식 관련 필드가 없으면 초기화합니다."""
+        data = self._cash_manager._load_data()
+        updated = False
+        
+        # overseas_balances 필드 초기화
+        if "overseas_balances" not in data:
+            data["overseas_balances"] = {}
+            for currency, initial_balance in OVERSEAS_INITIAL_BALANCES.items():
+                data["overseas_balances"][currency] = {
+                    "balance": initial_balance,
+                    "avg_exchange_rate": 0.0  # 환전 시 업데이트
+                }
+            updated = True
+            logger.info(f"해외 외화 잔고 초기화 완료")
+        
+        # overseas_holdings 필드 초기화
+        if "overseas_holdings" not in data:
+            data["overseas_holdings"] = {}
+            updated = True
+        
+        # overseas_transaction_history 필드 초기화
+        if "overseas_transaction_history" not in data:
+            data["overseas_transaction_history"] = []
+            updated = True
+        
+        if updated:
+            data["updated_at"] = datetime.now().isoformat()
+            self._cash_manager._save_data(data)
+    
+    def get_currency_for_exchange(self, exchange_code: str) -> str:
+        """거래소 코드에 대한 통화 코드를 반환합니다."""
+        return EXCHANGE_CURRENCY_MAP.get(exchange_code.upper(), "USD")
+    
+    def get_balance(self, currency: str) -> float:
+        """특정 통화의 잔고를 반환합니다."""
+        data = self._cash_manager._load_data()
+        balances = data.get("overseas_balances", {})
+        currency_data = balances.get(currency.upper(), {})
+        return float(currency_data.get("balance", 0))
+    
+    def get_all_balances(self) -> Dict[str, Dict[str, float]]:
+        """모든 외화 잔고를 반환합니다."""
+        data = self._cash_manager._load_data()
+        return data.get("overseas_balances", {})
+    
+    def get_holdings(self) -> Dict[str, Dict[str, Any]]:
+        """해외 주식 보유 현황을 반환합니다."""
+        data = self._cash_manager._load_data()
+        return data.get("overseas_holdings", {})
+    
+    def buy_stock(
+        self,
+        stock_code: str,
+        exchange_code: str,
+        quantity: int,
+        price: float
+    ) -> Dict[str, Any]:
+        """
+        해외주식 매수 시 외화 잔고를 차감하고 보유 종목을 업데이트합니다.
+        
+        Args:
+            stock_code (str): 종목코드 (예: "AAPL")
+            exchange_code (str): 해외거래소코드 (예: "NASD")
+            quantity (int): 주문수량
+            price (float): 체결가격 (해당 통화 기준)
+            
+        Returns:
+            dict: 처리 결과
+        """
+        currency = self.get_currency_for_exchange(exchange_code)
+        total_cost = quantity * price
+        
+        data = self._cash_manager._load_data()
+        balances = data.get("overseas_balances", {})
+        holdings = data.get("overseas_holdings", {})
+        
+        # 잔고 확인
+        current_balance = float(balances.get(currency, {}).get("balance", 0))
+        if current_balance < total_cost:
+            logger.warning(
+                f"[DEMO] 해외주식 매수 실패 - {currency} 잔고 부족: "
+                f"{current_balance:,.2f} < {total_cost:,.2f}"
+            )
+            return {
+                "success": False,
+                "error": f"{currency} 잔고 부족: {current_balance:,.2f} < {total_cost:,.2f}"
+            }
+        
+        # 잔고 차감
+        balances[currency]["balance"] = current_balance - total_cost
+        
+        # 보유 종목 업데이트 (평균 단가 계산)
+        stock_key = stock_code.upper()
+        if stock_key in holdings:
+            existing = holdings[stock_key]
+            old_qty = existing.get("quantity", 0)
+            old_avg = existing.get("avg_price", 0)
+            new_qty = old_qty + quantity
+            new_avg = ((old_qty * old_avg) + (quantity * price)) / new_qty if new_qty > 0 else 0
+            holdings[stock_key]["quantity"] = new_qty
+            holdings[stock_key]["avg_price"] = round(new_avg, 4)
+        else:
+            holdings[stock_key] = {
+                "exchange": exchange_code.upper(),
+                "quantity": quantity,
+                "avg_price": round(price, 4),
+                "currency": currency
+            }
+        
+        # 거래 내역 추가
+        transaction = {
+            "type": "buy",
+            "stock_code": stock_code.upper(),
+            "exchange": exchange_code.upper(),
+            "quantity": quantity,
+            "price": price,
+            "currency": currency,
+            "total_cost": total_cost,
+            "balance_after": balances[currency]["balance"],
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        data["overseas_balances"] = balances
+        data["overseas_holdings"] = holdings
+        data.setdefault("overseas_transaction_history", []).append(transaction)
+        data["updated_at"] = datetime.now().isoformat()
+        
+        self._cash_manager._save_data(data)
+        
+        logger.info(
+            f"[DEMO] 해외주식 매수: {stock_code} {quantity}주 @ {price:,.2f} {currency} "
+            f"= {total_cost:,.2f} {currency}, 잔고: {balances[currency]['balance']:,.2f} {currency}"
+        )
+        
+        return {
+            "success": True,
+            "stock_code": stock_code.upper(),
+            "exchange": exchange_code.upper(),
+            "quantity": quantity,
+            "price": price,
+            "total_cost": total_cost,
+            "currency": currency,
+            "remaining_balance": balances[currency]["balance"]
+        }
+    
+    def sell_stock(
+        self,
+        stock_code: str,
+        exchange_code: str,
+        quantity: int,
+        price: float
+    ) -> Dict[str, Any]:
+        """
+        해외주식 매도 시 외화 잔고를 증가시키고 보유 종목을 업데이트합니다.
+        
+        Args:
+            stock_code (str): 종목코드 (예: "AAPL")
+            exchange_code (str): 해외거래소코드 (예: "NASD")
+            quantity (int): 주문수량
+            price (float): 체결가격 (해당 통화 기준)
+            
+        Returns:
+            dict: 처리 결과
+        """
+        currency = self.get_currency_for_exchange(exchange_code)
+        total_proceeds = quantity * price
+        
+        data = self._cash_manager._load_data()
+        balances = data.get("overseas_balances", {})
+        holdings = data.get("overseas_holdings", {})
+        
+        # 보유 확인
+        stock_key = stock_code.upper()
+        if stock_key not in holdings:
+            logger.warning(f"[DEMO] 해외주식 매도 실패 - 보유 종목 없음: {stock_code}")
+            return {
+                "success": False,
+                "error": f"보유 종목 없음: {stock_code}"
+            }
+        
+        existing = holdings[stock_key]
+        current_qty = existing.get("quantity", 0)
+        avg_price = existing.get("avg_price", 0)
+        
+        if current_qty < quantity:
+            logger.warning(
+                f"[DEMO] 해외주식 매도 실패 - 보유 수량 부족: "
+                f"{current_qty} < {quantity}"
+            )
+            return {
+                "success": False,
+                "error": f"보유 수량 부족: {current_qty} < {quantity}"
+            }
+        
+        # 손익 계산
+        cost_basis = quantity * avg_price
+        pnl = total_proceeds - cost_basis
+        pnl_rate = (pnl / cost_basis * 100) if cost_basis > 0 else 0
+        
+        # 잔고 증가
+        if currency not in balances:
+            balances[currency] = {"balance": 0, "avg_exchange_rate": 0}
+        current_balance = float(balances[currency].get("balance", 0))
+        balances[currency]["balance"] = current_balance + total_proceeds
+        
+        # 보유 수량 감소
+        new_qty = current_qty - quantity
+        if new_qty <= 0:
+            del holdings[stock_key]
+        else:
+            holdings[stock_key]["quantity"] = new_qty
+        
+        # 거래 내역 추가
+        transaction = {
+            "type": "sell",
+            "stock_code": stock_code.upper(),
+            "exchange": exchange_code.upper(),
+            "quantity": quantity,
+            "price": price,
+            "currency": currency,
+            "total_proceeds": total_proceeds,
+            "cost_basis": cost_basis,
+            "pnl": pnl,
+            "pnl_rate": round(pnl_rate, 2),
+            "balance_after": balances[currency]["balance"],
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        data["overseas_balances"] = balances
+        data["overseas_holdings"] = holdings
+        data.setdefault("overseas_transaction_history", []).append(transaction)
+        data["updated_at"] = datetime.now().isoformat()
+        
+        self._cash_manager._save_data(data)
+        
+        logger.info(
+            f"[DEMO] 해외주식 매도: {stock_code} {quantity}주 @ {price:,.2f} {currency} "
+            f"= {total_proceeds:,.2f} {currency}, PnL: {pnl:+,.2f} ({pnl_rate:+.2f}%), "
+            f"잔고: {balances[currency]['balance']:,.2f} {currency}"
+        )
+        
+        return {
+            "success": True,
+            "stock_code": stock_code.upper(),
+            "exchange": exchange_code.upper(),
+            "quantity": quantity,
+            "price": price,
+            "total_proceeds": total_proceeds,
+            "pnl": pnl,
+            "pnl_rate": pnl_rate,
+            "currency": currency,
+            "remaining_balance": balances[currency]["balance"]
+        }
+    
+    def get_transaction_history(self, limit: int = 50) -> list:
+        """
+        해외주식 거래 내역을 반환합니다.
+        
+        Args:
+            limit (int): 반환할 최대 건수
+            
+        Returns:
+            list: 거래 내역 리스트 (최신순)
+        """
+        data = self._cash_manager._load_data()
+        history = data.get("overseas_transaction_history", [])
+        return list(reversed(history))[-limit:]
+    
+    def reset_balances(self):
+        """모든 해외 잔고를 초기화합니다."""
+        data = self._cash_manager._load_data()
+        
+        # 잔고 초기화
+        data["overseas_balances"] = {}
+        for currency, initial_balance in OVERSEAS_INITIAL_BALANCES.items():
+            data["overseas_balances"][currency] = {
+                "balance": initial_balance,
+                "avg_exchange_rate": 0.0
+            }
+        
+        # 보유 종목 초기화
+        data["overseas_holdings"] = {}
+        
+        # 거래 내역에 리셋 기록 추가
+        reset_transaction = {
+            "type": "reset",
+            "timestamp": datetime.now().isoformat(),
+            "memo": "해외 잔고 및 보유 종목 초기화"
+        }
+        data.setdefault("overseas_transaction_history", []).append(reset_transaction)
+        data["updated_at"] = datetime.now().isoformat()
+        
+        self._cash_manager._save_data(data)
+        logger.info(f"[DEMO] 해외 잔고 및 보유 종목 초기화 완료")
+
+
+def get_demo_overseas_cash_manager(account: str) -> DemoOverseasCashManager:
+    """
+    계좌별 해외주식 가상 현금 관리자 인스턴스를 반환합니다.
+    
+    Args:
+        account (str): 계좌번호
+        
+    Returns:
+        DemoOverseasCashManager: 해외주식 가상 현금 관리자 인스턴스
+    """
+    return DemoOverseasCashManager(account)

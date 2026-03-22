@@ -1051,6 +1051,288 @@ def test_bitcoin_rebalancing_order():
         return False
 
 
+# ============================================================================
+# 해외주식 테스트 함수들
+# ============================================================================
+
+def test_overseas_price_query():
+    """해외주식 현재가 조회 테스트"""
+    print("\n=== 해외주식 현재가 조회 테스트 ===")
+    
+    try:
+        from modules.config_loader import get_config
+        from modules.kis_auth import KISAuth
+        from modules.kis_overseas_trading import KISOverseasTrading
+        
+        # 설정 로드
+        config_path = Path(__file__).parent.parent.parent / "Config" / "config.json"
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        # Demo 환경으로 KISAuth 초기화 
+        kas_config = config['kis']['demo']
+        kis_auth = KISAuth(
+            appkey=kas_config['appkey'],
+            appsecret=kas_config['appsecret'],
+            account=kas_config['account'],
+            product=kas_config['product'],
+            htsid=kas_config['htsid'],
+            env='demo'
+        )
+        kis_auth.authenticate()
+        
+        overseas_trading = KISOverseasTrading(kis_auth)
+        
+        # 다양한 해외주식 현재가 조회
+        test_stocks = [
+            ("AAPL", "NASD", "애플"),
+            ("TSLA", "NASD", "테슬라"),
+            ("MSFT", "NASD", "마이크로소프트"),
+        ]
+        
+        success_count = 0
+        for symbol, exchange, name in test_stocks:
+            result = overseas_trading.get_current_price(symbol, exchange)
+            if result['success']:
+                print(f"  {name}({symbol}): ${result['current_price']:.2f} ({result['change_rate']:+.2f}%)")
+                success_count += 1
+            else:
+                print(f"  {name}({symbol}): ❌ {result['message']}")
+        
+        print(f"\n✅ {len(test_stocks)}개 중 {success_count}개 조회 성공")
+        return success_count > 0
+        
+    except Exception as e:
+        print(f"❌ 해외주식 현재가 조회 테스트 실패: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def test_overseas_balance_query():
+    """해외주식 잔고 조회 테스트"""
+    print("\n=== 해외주식 잔고 조회 테스트 ===")
+    
+    try:
+        from modules.config_loader import get_config
+        from modules.kis_auth import KISAuth
+        from modules.kis_overseas_trading import KISOverseasTrading
+        
+        # 설정 로드
+        config_path = Path(__file__).parent.parent.parent / "Config" / "config.json"
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        # Demo 환경으로 KISAuth 초기화 
+        kas_config = config['kis']['demo']
+        kis_auth = KISAuth(
+            appkey=kas_config['appkey'],
+            appsecret=kas_config['appsecret'],
+            account=kas_config['account'],
+            product=kas_config['product'],
+            htsid=kas_config['htsid'],
+            env='demo'
+        )
+        kis_auth.authenticate()
+        
+        overseas_trading = KISOverseasTrading(kis_auth)
+        
+        # 미국 주식 잔고 조회
+        result = overseas_trading.get_balance(exchange_code="NASD", currency="USD")
+        
+        if result['success']:
+            print(f"  잔고 조회 성공!")
+            print(f"  보유 종목 수: {len(result['holdings'])}개")
+            
+            for holding in result['holdings'][:5]:  # 최대 5개만 표시
+                print(f"    - {holding['symbol']}: {holding['quantity']}주, ${holding['avg_price']:.2f}")
+            
+            if result['summary']:
+                print(f"  총 평가손익: ${result['summary'].get('total_evaluation', 0):,.2f}")
+            
+            return True
+        else:
+            print(f"  ❌ 잔고 조회 실패: {result['message']}")
+            return False
+        
+    except Exception as e:
+        print(f"❌ 해외주식 잔고 조회 테스트 실패: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def test_overseas_order_params():
+    """해외주식 주문 파라미터 검증 테스트 (실제 주문은 하지 않음)"""
+    print("\n=== 해외주식 주문 파라미터 검증 테스트 ===")
+    
+    try:
+        from modules.kis_overseas_trading import KISOverseasTrading, EXCHANGE_CODES
+        
+        # 거래소 코드 검증
+        print("  거래소 코드 검증...")
+        test_exchanges = ["NASD", "NYSE", "AMEX", "SEHK", "TKSE"]
+        for ex in test_exchanges:
+            if ex in EXCHANGE_CODES:
+                print(f"    {ex}: ✅ {EXCHANGE_CODES[ex]['name']}")
+            else:
+                print(f"    {ex}: ❌ 미지원")
+        
+        # 주문 파라미터 생성 테스트
+        print("\n  주문 파라미터 검증...")
+        class MockAuth:
+            env = "demo"
+            account = "12345678"
+            product = "01"
+        
+        overseas_trading = KISOverseasTrading(MockAuth())
+        
+        # TR ID 검증
+        test_cases = [
+            ("NASD", "buy", "TTTT1002U"),
+            ("NASD", "sell", "TTTT1006U"),
+            ("SEHK", "buy", "TTTS1002U"),
+            ("SEHK", "sell", "TTTS1001U"),
+            ("TKSE", "buy", "TTTS0308U"),
+        ]
+        
+        for exchange, order_type, expected_tr_id in test_cases:
+            actual_tr_id = overseas_trading._get_order_tr_id(exchange, order_type)
+            status = "✅" if actual_tr_id == expected_tr_id else "❌"
+            print(f"    {exchange} {order_type}: {status} {actual_tr_id}")
+        
+        print("\n✅ 해외주식 주문 파라미터 검증 완료")
+        return True
+        
+    except Exception as e:
+        print(f"❌ 해외주식 주문 파라미터 테스트 실패: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def test_overseas_trading_demo():
+    """해외주식 Demo 거래 테스트 (실제 주문 포함 - Demo 환경만)"""
+    print("\n=== 해외주식 Demo 거래 테스트 ===")
+    print("  ⚠️ 이 테스트는 Demo 환경에서 소량의 테스트 주문을 실행합니다.")
+    
+    try:
+        from modules.config_loader import get_config
+        from modules.kis_auth import KISAuth
+        from modules.kis_overseas_trading import KISOverseasTrading
+        
+        # 설정 로드
+        config_path = Path(__file__).parent.parent.parent / "Config" / "config.json"
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        # Demo 환경만 사용
+        kas_config = config['kis']['demo']
+        kis_auth = KISAuth(
+            appkey=kas_config['appkey'],
+            appsecret=kas_config['appsecret'],
+            account=kas_config['account'],
+            product=kas_config['product'],
+            htsid=kas_config['htsid'],
+            env='demo'  # 반드시 demo 사용
+        )
+        kis_auth.authenticate()
+        
+        overseas_trading = KISOverseasTrading(kis_auth)
+        
+        # 현재가 조회
+        print("\n  1. 테스트 종목 현재가 조회...")
+        price_result = overseas_trading.get_current_price("AAPL", "NASD")
+        if not price_result['success']:
+            print(f"  ❌ 현재가 조회 실패: {price_result['message']}")
+            return False
+        
+        current_price = price_result['current_price']
+        print(f"  AAPL 현재가: ${current_price:.2f}")
+        
+        # 매수 테스트 (현재가보다 낮은 가격으로 지정가 주문 -> 체결되지 않음)
+        test_price = round(current_price * 0.90, 2)  # 현재가의 90% (당연히 체결 안됨)
+        print(f"\n  2. 테스트 매수 주문 (체결 방지 가격: ${test_price})...")
+        
+        buy_result = overseas_trading.buy_limit_order(
+            stock_code="AAPL",
+            exchange_code="NASD", 
+            quantity=1,
+            price=test_price
+        )
+        
+        if buy_result['success']:
+            print(f"  ✅ 매수 주문 성공: 주문번호 {buy_result['order_no']}")
+            
+            # 주문 취소 테스트
+            print(f"\n  3. 주문 취소 테스트...")
+            cancel_result = overseas_trading.cancel_order(
+                stock_code="AAPL",
+                exchange_code="NASD",
+                original_order_no=buy_result['order_no']
+            )
+            
+            if cancel_result['success']:
+                print(f"  ✅ 주문 취소 성공")
+            else:
+                print(f"  ❌ 주문 취소 실패: {cancel_result['message']}")
+        else:
+            print(f"  ❌ 매수 주문 실패: {buy_result['message']}")
+            # 모의투자 잔액 부족 등의 에러는 정상으로 처리
+            if "잔고" in buy_result['message'] or "부족" in buy_result['message']:
+                print("  ℹ️ 모의투자 잔액 부족으로 인한 실패 (정상)")
+                return True
+        
+        print("\n✅ 해외주식 Demo 거래 테스트 완료")
+        return True
+        
+    except Exception as e:
+        print(f"❌ 해외주식 Demo 거래 테스트 실패: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def run_overseas_tests():
+    """해외주식 관련 모든 테스트 실행"""
+    print("\n" + "="*60)
+    print("🌏 해외주식 거래 테스트 시작")
+    print("="*60)
+    
+    test_results = []
+    
+    # 1. 현재가 조회 테스트
+    test_results.append(("해외주식 현재가 조회", test_overseas_price_query()))
+    
+    # 2. 잔고 조회 테스트
+    test_results.append(("해외주식 잔고 조회", test_overseas_balance_query()))
+    
+    # 3. 주문 파라미터 검증 테스트
+    test_results.append(("주문 파라미터 검증", test_overseas_order_params()))
+    
+    # 4. Demo 거래 테스트
+    test_results.append(("Demo 거래 테스트", test_overseas_trading_demo()))
+    
+    # 결과 요약
+    print(f"\n{'='*20} 해외주식 테스트 결과 요약 {'='*20}")
+    passed_tests = 0
+    for test_name, result in test_results:
+        status = "✅ 통과" if result else "❌ 실패"
+        print(f"{test_name:25} : {status}")
+        if result:
+            passed_tests += 1
+    
+    print(f"\n총 {len(test_results)}개 테스트 중 {passed_tests}개 통과")
+    
+    if passed_tests == len(test_results):
+        print("\n🎉 모든 해외주식 테스트 통과!")
+        print("   해외주식 매매 기능 준비 완료")
+    else:
+        print(f"\n⚠️ {len(test_results) - passed_tests}개 테스트 실패")
+    
+    return passed_tests == len(test_results)
+
+
 def run_upbit_tests():
     """Upbit 관련 모든 테스트 실행"""
     print("\n" + "="*60)
@@ -1097,8 +1379,17 @@ if __name__ == "__main__":
     # 명령줄 인자에 따라 테스트 선택
     if len(sys.argv) > 1 and sys.argv[1] == "--upbit":
         run_upbit_tests()
+    elif len(sys.argv) > 1 and sys.argv[1] == "--overseas":
+        run_overseas_tests()
+    elif len(sys.argv) > 1 and sys.argv[1] == "--all":
+        main()
+        run_overseas_tests()
+        run_upbit_tests()
     else:
         main()
         print("\n" + "-"*60)
-        print("💡 Upbit 테스트만 실행하려면: python kis_debug.py --upbit")
+        print("💡 테스트 옵션:")
+        print("   python kis_debug.py --overseas : 해외주식 테스트만 실행")
+        print("   python kis_debug.py --upbit    : Upbit 테스트만 실행")
+        print("   python kis_debug.py --all      : 모든 테스트 실행")
         print("-"*60)

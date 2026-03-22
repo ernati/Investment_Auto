@@ -131,6 +131,24 @@ Scripts/modules/demo_data/cash_[계좌번호].json
 {
   "account": "12345678",
   "cash_balance": 9250000,
+  "upbit_krw_balance": 2000000,
+  "upbit_btc_balance": 0.05,
+  "upbit_avg_buy_price": 115000000,
+  "overseas_balances": {
+    "USD": {"balance": 10000.00, "avg_exchange_rate": 0.0},
+    "JPY": {"balance": 500000, "avg_exchange_rate": 0.0},
+    "HKD": {"balance": 50000.00, "avg_exchange_rate": 0.0},
+    "CNY": {"balance": 10000.00, "avg_exchange_rate": 0.0},
+    "VND": {"balance": 50000000, "avg_exchange_rate": 0.0}
+  },
+  "overseas_holdings": {
+    "AAPL": {
+      "exchange": "NASD",
+      "quantity": 10,
+      "avg_price": 175.50,
+      "currency": "USD"
+    }
+  },
   "created_at": "2025-01-20T10:00:00",
   "updated_at": "2025-01-20T11:30:00", 
   "transaction_history": [
@@ -145,8 +163,77 @@ Scripts/modules/demo_data/cash_[계좌번호].json
       "price": 75000,
       "memo": "005930 10주 매수"
     }
-  ]
+  ],
+  "upbit_transaction_history": [],
+  "overseas_transaction_history": []
 }
+```
+
+## 해외주식 Demo 기능 (신규)
+
+### 지원 통화
+| 통화 | 설명 | 초기 잔고 | 지원 거래소 |
+|-----|------|----------|-----------|
+| USD | 미국 달러 | $10,000 | NASD, NYSE, AMEX |
+| JPY | 일본 엔 | ¥500,000 | TKSE |
+| HKD | 홍콩 달러 | HK$50,000 | SEHK |
+| CNY | 중국 위안 | ¥10,000 | SHAA, SZAA |
+| VND | 베트남 동 | ₫50,000,000 | HASE, VNSE |
+
+### 해외주식 매수/매도 사용법
+```python
+from modules.demo_cash_manager import get_demo_overseas_cash_manager
+
+# 해외주식 현금 관리자 생성
+manager = get_demo_overseas_cash_manager("12345678")
+
+# 외화 잔고 조회
+usd_balance = manager.get_balance("USD")
+print(f"USD 잔고: ${usd_balance:,.2f}")
+
+# 모든 외화 잔고 조회
+all_balances = manager.get_all_balances()
+
+# 해외주식 매수 (AAPL 10주 @ $175.50)
+result = manager.buy_stock(
+    stock_code="AAPL",
+    exchange_code="NASD",
+    quantity=10,
+    price=175.50
+)
+
+# 해외주식 매도 (AAPL 5주 @ $180.00)
+result = manager.sell_stock(
+    stock_code="AAPL",
+    exchange_code="NASD",
+    quantity=5,
+    price=180.00
+)
+
+# 보유 종목 조회
+holdings = manager.get_holdings()
+
+# 거래 내역 조회
+history = manager.get_transaction_history(10)
+
+# 잔고 초기화
+manager.reset_balances()
+```
+
+### KIS 해외주식 거래와 연동
+모의투자 환경에서 `kis_overseas_trading.py`를 통한 해외주식 주문 시 자동으로 외화 잔고가 업데이트됩니다:
+```python
+from modules.kis_overseas_trading import KISOverseasTrading
+from modules.kis_auth import KISAuth
+
+auth = KISAuth(config_path="Config/config.json", env="demo")
+trading = KISOverseasTrading(auth)
+
+# 미국 주식 매수 (주문 성공 시 USD 자동 차감)
+result = trading.buy_limit_order("AAPL", "NASD", 10, 175.50)
+
+# 미국 주식 매도 (주문 성공 시 USD 자동 증가)
+result = trading.sell_limit_order("AAPL", "NASD", 5, 180.00)
 ```
 
 ## 주의사항
@@ -155,12 +242,13 @@ Scripts/modules/demo_data/cash_[계좌번호].json
 2. **가격 추정**: 시장가 주문 시 종목별 고정 가격 사용 (실제 시세 연동 필요 시 추가 구현)
 3. **데이터 백업**: JSON 파일 수동 백업 권장
 4. **계좌별 분리**: 각 계좌별로 독립적인 현금 관리
+5. **환전 미지원**: 현재 원화 ↔ 외화 환전 기능은 미구현
 
 ## 향후 개선 사안
 
 1. **실시간 시세 연동**: 현재가 API를 통한 정확한 가격 적용
 2. **수수료 계산**: 거래 수수료 자동 차감
-3. **보유종목 관리**: 매수/매도한 종목 수량 추적
+3. **환전 기능**: 원화 ↔ 외화 환전 기능 추가
 4. **데이터베이스 연동**: JSON 대신 SQLite 또는 다른 DB 사용
 5. **웹 인터페이스**: 브라우저 기반 관리 도구
 
