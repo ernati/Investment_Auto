@@ -385,8 +385,13 @@ class PortfolioConfigLoader:
                     print(f"  [{category}]:")
                     category_total = 0.0
                     for ticker, weight in assets.items():
-                        print(f"    {ticker}: {weight*100:.1f}%")
-                        category_total += weight
+                        # overseas_stocks의 경우 weight가 dict 형태 ({"exchange": "AMEX", "weight": 0.4})
+                        if isinstance(weight, dict):
+                            actual_weight = weight.get("weight", 0)
+                        else:
+                            actual_weight = weight
+                        print(f"    {ticker}: {actual_weight*100:.1f}%")
+                        category_total += actual_weight
                     print(f"    소계: {category_total*100:.1f}%")
         
         # 리밸런싱 설정
