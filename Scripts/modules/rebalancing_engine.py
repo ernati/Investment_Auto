@@ -50,6 +50,9 @@ class RebalancingEngine:
         """
         중첩된 target_weights 구조를 평면적인 딕셔너리로 변환합니다.
         
+        overseas_stocks의 경우 {ticker: {exchange: ..., weight: ...}} 형태이므로
+        내부의 weight 값을 추출합니다.
+        
         Returns:
             dict: {ticker: weight} 형태의 평면적인 딕셔너리
         """
@@ -57,8 +60,19 @@ class RebalancingEngine:
         
         for category, assets in self.target_weights_nested.items():
             if isinstance(assets, dict):
-                for ticker, weight in assets.items():
-                    flattened[ticker] = weight
+                for ticker, weight_info in assets.items():
+                    # weight_info가 dict인 경우 (해외주식: {exchange: ..., weight: ...})
+                    if isinstance(weight_info, dict):
+                        actual_weight = weight_info.get("weight", 0)
+                        logger.debug(
+                            f"Overseas stock {ticker}: extracted weight={actual_weight} "
+                            f"from {weight_info}"
+                        )
+                    else:
+                        # float인 경우 (국내주식, 코인 등)
+                        actual_weight = weight_info
+                    
+                    flattened[ticker] = actual_weight
                     
         logger.debug(f"Flattened target weights: {flattened}")
         return flattened
