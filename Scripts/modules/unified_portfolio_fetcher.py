@@ -28,21 +28,24 @@ BITCOIN_TICKER = "bitcoin"
 
 
 class UnifiedPortfolioFetcher:
-    """KIS와 Upbit의 포트폴리오를 통합 조회하는 클래스"""
+    ""한국투자증권(KIS)와 Upbit의 포트폴리오를 통합 조회하는 클래스"""
     
     def __init__(
         self,
         kis_auth: KISAuth,
         upbit_client: Optional[UpbitClient] = None,
-        env: str = "demo"
+        env: str = "demo",
+        overseas_stocks_config: Optional[Dict[str, Dict]] = None
     ):
         """
         Args:
             kis_auth (KISAuth): KIS 인증 정보
             upbit_client (UpbitClient, optional): Upbit 클라이언트
             env (str): 환경 설정 ('real' 또는 'demo')
+            overseas_stocks_config (dict, optional): 해외주식 설정
+                예: {"SPY": {"exchange": "AMEX", "weight": 0.4}, ...}
         """
-        self.kis_fetcher = KISPortfolioFetcher(kis_auth)
+        self.kis_fetcher = KISPortfolioFetcher(kis_auth, overseas_stocks_config)
         self.env = env
         
         # Upbit 클라이언트 설정
@@ -236,17 +239,20 @@ class UnifiedPortfolioFetcher:
 
 def create_unified_fetcher(
     kis_auth: KISAuth,
-    env: str = "demo"
+    env: str = "demo",
+    overseas_stocks_config: Optional[Dict[str, Dict]] = None
 ) -> UnifiedPortfolioFetcher:
     """
-    통합 포트폴리오 페처를 생성합니다.
+    통합 포트폴리오 페치를 폼성합니다.
     
     Args:
         kis_auth (KISAuth): KIS 인증 정보
         env (str): 환경 설정 ('real' 또는 'demo')
+        overseas_stocks_config (dict, optional): 해외주식 설정
+            예: {"SPY": {"exchange": "AMEX", "weight": 0.4}, ...}
         
     Returns:
-        UnifiedPortfolioFetcher: 통합 페처 인스턴스
+        UnifiedPortfolioFetcher: 통합 페치 인스턴스
     """
     upbit_client = get_upbit_client(env)
-    return UnifiedPortfolioFetcher(kis_auth, upbit_client, env)
+    return UnifiedPortfolioFetcher(kis_auth, upbit_client, env, overseas_stocks_config)

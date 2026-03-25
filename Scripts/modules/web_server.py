@@ -13,7 +13,7 @@ from flask import Flask, render_template, jsonify, request
 import json
 from pathlib import Path
 
-from .config_loader import get_config
+from .config_loader import get_config, get_portfolio_config
 from .kis_auth import KISAuth
 from .kis_portfolio_fetcher import KISPortfolioFetcher
 from .db_manager import DatabaseManager
@@ -63,7 +63,20 @@ class PortfolioWebServer:
                 htsid=kis_config["htsid"],
                 env=env
             )
-            self.portfolio_fetcher = KISPortfolioFetcher(self.kis_auth)
+            
+            # 해외주식 설정 가져오기
+            overseas_stocks_config = None
+            try:
+                portfolio_config = get_portfolio_config()
+                portfolio_config.load()
+                target_weights = portfolio_config.get("target_weights", {})
+                overseas_stocks_config = target_weights.get("overseas_stocks", {})
+                if overseas_stocks_config:
+                    logger.info(f"Web server loaded overseas stocks: {list(overseas_stocks_config.keys())}")
+            except Exception as e:
+                logger.warning(f"Failed to load overseas stocks config: {e}")
+            
+            self.portfolio_fetcher = KISPortfolioFetcher(self.kis_auth, overseas_stocks_config)
             logger.info(f"Web server initialized for {env} environment")
         except Exception as e:
             logger.error(f"Failed to initialize KIS API: {e}")

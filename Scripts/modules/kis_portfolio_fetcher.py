@@ -5,10 +5,11 @@ KIS API Portfolio Data Module
 - 계좌 잔고 조회
 - 보유종목 조회
 - 가격 데이터 조회
+- 해외주식 가격 조회 (overseas_stocks 설정 기반)
 """
 
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime
 
 import pandas as pd
@@ -17,6 +18,7 @@ from .demo_cash_manager import get_demo_cash_manager
 from .kis_auth import KISAuth
 from .portfolio_models import PortfolioSnapshot, PositionSnapshot, PriceSnapshot
 from .kis_api_utils import build_api_headers, validate_api_response, execute_api_request_with_retry
+from .kis_overseas_trading import KISOverseasTrading
 
 
 logger = logging.getLogger(__name__)
@@ -25,13 +27,29 @@ logger = logging.getLogger(__name__)
 class KISPortfolioFetcher:
     """KIS API를 통해 포트폴리오 데이터를 조회하는 클래스"""
     
-    def __init__(self, kis_auth: KISAuth):
+    def __init__(self, kis_auth: KISAuth, overseas_stocks_config: Optional[Dict[str, Dict]] = None):
         """
         Args:
             kis_auth (KISAuth): 인증 정보를 담은 KISAuth 인스턴스
+            overseas_stocks_config (dict, optional): 해외주식 설정
+                예: {"SPY": {"exchange": "AMEX", "weight": 0.4}, ...}
         """
         self.kis_auth = kis_auth
         self.base_url = kis_auth.base_url
+        
+        # 해외주식 설정 저장 (티커 -> 거래소 매핑)
+        self.overseas_stocks: Dict[str, str] = {}
+        if overseas_stocks_config:
+            for ticker, config in overseas_stocks_config.items():
+                if isinstance(config, dict):
+                    exchange = config.get('exchange', 'NASD')
+                else:
+                    exchange = 'NASD'  # 기본값
+                self.overseas_stocks[ticker] = exchange
+            logger.info(f"Overseas stocks configured: {list(self.overseas_stocks.keys())}")
+        
+        # 해외주식 거래 모듈 (lazy init)
+        self._overseas_trading: Optional[KISOverseasTrading] = None
         
     def fetch_account_balance(self) -> Dict[str, float]:
         """
@@ -232,19 +250,74 @@ class KISPortfolioFetcher:
         종목의 현재가를 조회합니다.
         
         Args:
-            ticker (str): 종목코드 (주식 또는 채권)
+            ticker (str): 종목코드 (국내주식, 해외주식, 또는 채권)
             max_retries (int): 최대 재시도 횟수
             
         Returns:
             float: 현재가
         """
-        # 채권 코드 판별 (KR로 시작하고 길이가 12자리인 경우)
+        # 1) 해외주식 판별 (overseas_stocks 설정에 있는 경우)
+        if ticker in self.overseas_stocks:
+            exchange = self.overseas_stocks[ticker]
+            return self._fetch_overseas_price(ticker, exchange, max_retries)
+        
+        # 2) 채권 코드 판별 (KR로 시작하고 길이가 12자리인 경우)
         is_bond = ticker.startswith('KR') and len(ticker) == 12
         
         if is_bond:
             return self._fetch_bond_price(ticker, max_retries)
         else:
             return self._fetch_stock_price(ticker, max_retries)
+    
+    def _get_overseas_trading(self) -> KISOverseasTrading:
+        """KISOverseasTrading 인스턴스를 반환합니다 (lazy initialization)."""
+        if self._overseas_trading is None:
+            self._overseas_trading = KISOverseasTrading(self.kis_auth)
+        return self._overseas_trading
+    
+    def _fetch_overseas_price(self, ticker: str, exchange: str, max_retries: int = 3) -> float:
+        """
+        해외주식 현재가 조회
+        
+        Args:
+            ticker (str): 종목코드 (예: 'SPY', 'QQQ')
+            exchange (str): 거래소 코드 (예: 'AMEX', 'NASD', 'NYSE')
+            max_retries (int): 최대 재시도 횟수
+            
+        Returns:
+            float: 현재가 (USD 등 외화 기준)
+        """
+        last_error = None
+        overseas_trading = self._get_overseas_trading()
+        
+        for attempt in range(max_retries):
+            try:
+                result = overseas_trading.get_current_price(ticker, exchange)
+                
+                if result.get('success'):
+                    price = result.get('current_price', 0)
+                    if price > 0:
+                        logger.debug(f"Overseas stock price fetched for {ticker}: {price}")
+                        return price
+                    else:
+                        logger.warning(f"Zero overseas price returned for {ticker} on attempt {attempt + 1}")
+                else:
+                    logger.warning(
+                        f"Overseas price fetch failed for {ticker} on attempt {attempt + 1}: "
+                        f"{result.get('message', 'Unknown error')}"
+                    )
+                    last_error = RuntimeError(result.get('message', 'Unknown error'))
+                    
+            except Exception as e:
+                last_error = e
+                logger.warning(f"Overseas price fetch failed for {ticker} on attempt {attempt + 1}: {e}")
+            
+            if attempt < max_retries - 1:
+                import time
+                time.sleep(0.5)
+        
+        logger.error(f"Failed to fetch overseas price for {ticker} after {max_retries} attempts: {last_error}")
+        return 0.0
     
     def _fetch_stock_price(self, ticker: str, max_retries: int = 3) -> float:
         """주식 현재가 조회"""

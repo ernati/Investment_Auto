@@ -130,9 +130,19 @@ class PortfolioRebalancingApp:
         self.upbit_client = get_upbit_client(kis_env)
         logger.info("Upbit client initialized")
         
-        # 통합 포트폴리오 페처 초기화 (KIS + Upbit)
-        self.portfolio_fetcher = create_unified_fetcher(self.kis_auth, kis_env)
-        logger.info("Unified portfolio fetcher initialized (KIS + Upbit)")
+        # 해외주식 설정 가져오기
+        target_weights = self.config.get("target_weights", {})
+        overseas_stocks_config = target_weights.get("overseas_stocks", {})
+        if overseas_stocks_config:
+            logger.info(f"Overseas stocks config loaded: {list(overseas_stocks_config.keys())}")
+        
+        # 통합 포트폴리오 페처 초기화 (KIS + Upbit + 해외주식)
+        self.portfolio_fetcher = create_unified_fetcher(
+            self.kis_auth, 
+            kis_env, 
+            overseas_stocks_config=overseas_stocks_config
+        )
+        logger.info("Unified portfolio fetcher initialized (KIS + Upbit + Overseas)")
         
         self.scheduler = PortfolioScheduler(self.config)
         self.rebalancing_engine = RebalancingEngine(self.config)
