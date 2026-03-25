@@ -28,7 +28,7 @@ BITCOIN_TICKER = "bitcoin"
 
 
 class UnifiedPortfolioFetcher:
-    ""한국투자증권(KIS)와 Upbit의 포트폴리오를 통합 조회하는 클래스"""
+    """한국투자증권(KIS)와 Upbit의 포트폴리오를 통합 조회하는 클래스"""
     
     def __init__(
         self,
