@@ -103,6 +103,9 @@ class RebalanceOrder:
     # 주문 실행 관련
     estimated_quantity: int = 0   # 예상 수량
     estimated_price: float = 0.0  # 예상 가격
+    
+    # 해외주식 정보 (None이면 국내주식)
+    exchange: Optional[str] = None  # 해외거래소코드 (NASD, NYSE, AMEX 등)
 
 
 @dataclass

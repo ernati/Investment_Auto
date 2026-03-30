@@ -31,6 +31,7 @@ class RebalancingEngine:
         self.portfolio_id = self.config.get_basic("portfolio_id")
         self.target_weights_nested = self.config.get_basic("target_weights", {})  # 중첩된 원본
         self.target_weights = self._flatten_target_weights()  # 평면화된 버전
+        self.overseas_exchanges = self._extract_overseas_exchanges()  # 해외주식 거래소 정보
         self.rebalance_mode = self.config.get_basic("rebalance/mode", "HYBRID")
         self.cash_buffer_ratio = self.config.get_basic("trade/cash_buffer_ratio", 0.02)
         self.min_order_krw = self.config.get_basic("trade/min_order_krw", 100000)
@@ -45,6 +46,25 @@ class RebalancingEngine:
             f"band_type={self.band_type}, "
             f"band_value={self.band_value}"
         )
+        if self.overseas_exchanges:
+            logger.info(f"Overseas stocks configured: {self.overseas_exchanges}")
+    
+    def _extract_overseas_exchanges(self) -> dict:
+        """
+        overseas_stocks에서 티커별 거래소 정보를 추출합니다.
+        
+        Returns:
+            dict: {ticker: exchange_code} 형태의 딕셔너리
+        """
+        exchanges = {}
+        overseas_stocks = self.target_weights_nested.get("overseas_stocks", {})
+        
+        for ticker, info in overseas_stocks.items():
+            if isinstance(info, dict) and "exchange" in info:
+                exchanges[ticker] = info["exchange"]
+                logger.debug(f"Overseas stock {ticker}: exchange={info['exchange']}")
+        
+        return exchanges
     
     def _flatten_target_weights(self) -> dict:
         """
@@ -302,6 +322,9 @@ class RebalancingEngine:
                 )
                 continue
 
+            # 해외주식 거래소 정보 확인
+            exchange = self.overseas_exchanges.get(ticker)
+            
             order = RebalanceOrder(
                 ticker=ticker,
                 action=action,
@@ -310,17 +333,21 @@ class RebalancingEngine:
                 delta_value=delta_value,
                 delta_weight=delta_weight,
                 estimated_quantity=estimated_quantity,
-                estimated_price=price
+                estimated_price=price,
+                exchange=exchange  # 해외주식인 경우 거래소 코드, 아니면 None
             )
             
             orders.append(order)
             
-            logger.debug(
+            log_msg = (
                 f"Order created for {ticker}: "
                 f"action={action}, "
                 f"delta_value={delta_value:.2f}, "
                 f"current_weight={current_weight:.4f} -> target_weight={target_weight:.4f}"
             )
+            if exchange:
+                log_msg += f", exchange={exchange}"
+            logger.debug(log_msg)
         
         return orders
     
@@ -389,7 +416,8 @@ class RebalancingEngine:
                 delta_value=order.delta_value,
                 delta_weight=order.delta_weight,
                 estimated_quantity=order.estimated_quantity,
-                estimated_price=order.estimated_price
+                estimated_price=order.estimated_price,
+                exchange=order.exchange  # 해외주식 정보 유지
             ))
         
         messages = []

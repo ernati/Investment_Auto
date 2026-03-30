@@ -3,6 +3,7 @@
 Order Execution Module
 실제 주문 실행: 리밸런싱 계획을 KIS API를 통해 주문으로 변환, 실행
 Upbit를 통한 비트코인 주문도 지원
+해외주식 주문도 지원 (KISOverseasTrading 사용)
 Dry-run 모드도 지원
 """
 
@@ -14,6 +15,7 @@ from .config_loader import PortfolioConfigLoader
 from .kis_auth import KISAuth
 from .portfolio_models import RebalancePlan, ExecutionResult, RebalanceOrder
 from .kis_trading import KISTrading
+from .kis_overseas_trading import KISOverseasTrading
 from .upbit_api_client import UpbitClient, get_upbit_client
 
 
@@ -25,7 +27,7 @@ BITCOIN_TICKER = "bitcoin"
 
 
 class OrderExecutor:
-    """주문 실행 엔진 (KIS 주식 + Upbit 비트코인)"""
+    """주문 실행 엔진 (KIS 국내주식/해외주식 + Upbit 비트코인)"""
     
     def __init__(
         self,
@@ -46,8 +48,11 @@ class OrderExecutor:
         self.base_url = kis_auth.base_url
         self.env = env
         
-        # KISTrading 인스턴스 생성
+        # KISTrading 인스턴스 생성 (국내주식)
         self.trading = KISTrading(kis_auth)
+        
+        # KISOverseasTrading 인스턴스 생성 (해외주식)
+        self.overseas_trading = KISOverseasTrading(kis_auth)
         
         # Upbit 클라이언트 설정
         if upbit_client:
@@ -198,38 +203,18 @@ class OrderExecutor:
     def _execute_order_live(self, order: RebalanceOrder, result: ExecutionResult) -> None:
         """
         실전 모드에서 실제 주문을 실행합니다.
+        해외주식(exchange 필드가 있는 경우)과 국내주식을 구분하여 처리합니다.
         
         Args:
             order (RebalanceOrder): 주문 정보
             result (ExecutionResult): 실행 결과 객체
         """
         try:
-            # KISTrading 모듈을 사용하여 주문 실행
-            if self.order_type == "market":
-                if order.action == "buy":
-                    order_result = self.trading.buy_market_order(
-                        stock_code=order.ticker,
-                        quantity=order.estimated_quantity
-                    )
-                else:  # sell
-                    order_result = self.trading.sell_market_order(
-                        stock_code=order.ticker,
-                        quantity=order.estimated_quantity
-                    )
-            else:  # limit order
-                price = int(order.estimated_price)
-                if order.action == "buy":
-                    order_result = self.trading.buy_limit_order(
-                        stock_code=order.ticker,
-                        quantity=order.estimated_quantity,
-                        price=price
-                    )
-                else:  # sell
-                    order_result = self.trading.sell_limit_order(
-                        stock_code=order.ticker,
-                        quantity=order.estimated_quantity,
-                        price=price
-                    )
+            # 해외주식 여부 확인
+            if order.exchange:
+                order_result = self._execute_overseas_order(order)
+            else:
+                order_result = self._execute_domestic_order(order)
             
             # 주문 성공
             if order_result.get("success"):
@@ -255,4 +240,71 @@ class OrderExecutor:
                     
             logger.error(f"Error placing order for {order.ticker}: {error_msg}")
             raise RuntimeError(error_msg)
+    
+    def _execute_domestic_order(self, order: RebalanceOrder) -> Dict:
+        """
+        국내주식 주문을 실행합니다.
+        
+        Args:
+            order (RebalanceOrder): 주문 정보
+            
+        Returns:
+            Dict: 주문 결과
+        """
+        if self.order_type == "market":
+            if order.action == "buy":
+                return self.trading.buy_market_order(
+                    stock_code=order.ticker,
+                    quantity=order.estimated_quantity
+                )
+            else:  # sell
+                return self.trading.sell_market_order(
+                    stock_code=order.ticker,
+                    quantity=order.estimated_quantity
+                )
+        else:  # limit order
+            price = int(order.estimated_price)
+            if order.action == "buy":
+                return self.trading.buy_limit_order(
+                    stock_code=order.ticker,
+                    quantity=order.estimated_quantity,
+                    price=price
+                )
+            else:  # sell
+                return self.trading.sell_limit_order(
+                    stock_code=order.ticker,
+                    quantity=order.estimated_quantity,
+                    price=price
+                )
+    
+    def _execute_overseas_order(self, order: RebalanceOrder) -> Dict:
+        """
+        해외주식 주문을 실행합니다.
+        
+        Note:
+            해외주식 모의투자는 지정가 주문만 지원합니다.
+        
+        Args:
+            order (RebalanceOrder): 주문 정보
+            
+        Returns:
+            Dict: 주문 결과
+        """
+        logger.info(
+            f"Executing overseas order: {order.ticker} @ {order.exchange}, "
+            f"action={order.action}, qty={order.estimated_quantity}"
+        )
+        
+        # 해외주식은 지정가 주문 사용 (모의투자 제약)
+        # 시장가를 원하면 현재가 기준으로 약간 높은/낮은 가격으로 지정가 주문
+        price = str(order.estimated_price)
+        
+        return self.overseas_trading.order(
+            stock_code=order.ticker,
+            exchange_code=order.exchange,
+            order_type=order.action,
+            quantity=order.estimated_quantity,
+            price=price,
+            order_division="00"  # 지정가
+        )
     
