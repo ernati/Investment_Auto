@@ -50,7 +50,9 @@ RebalancingEngine(config_loader: PortfolioConfigLoader)
 | 속성 | 설명 |
 |------|------|
 | `portfolio_id` | 포트폴리오 ID |
-| `target_weights` | 목표 비중 딕셔너리 |
+| `target_weights` | 목표 비중 딕셔너리 (평면화된 버전) |
+| `target_weights_nested` | 원본 중첩 구조 (국내/해외/코인 구분) |
+| `overseas_exchanges` | 해외주식 거래소 매핑 `{ticker: exchange}` (**v1.4**) |
 | `rebalance_mode` | BAND, CALENDAR, HYBRID |
 | `band_type` | ABS(절대) 또는 REL(상대) |
 | `band_value` | 밴드 값 |

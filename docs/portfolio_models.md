@@ -123,14 +123,20 @@ class RebalanceOrder:
     
     estimated_quantity: int = 0    # 예상 수량
     estimated_price: float = 0.0   # 예상 가격
+    
+    # 해외주식 정보 (v1.4 추가)
+    exchange: Optional[str] = None  # 해외거래소코드 (NASD, NYSE, AMEX 등)
+                                    # None이면 국내주식
 ```
 
 **의미:**
 - `delta_value > 0`: 매수 필요 (buy)
 - `delta_value < 0`: 매도 필요 (sell)
+- `exchange`: 해외주식인 경우 거래소 코드 (예: "NYSE", "NASD")
 
 **사용 예:**
 ```python
+# 국내주식 주문
 order = RebalanceOrder(
     ticker="005930",
     action="buy",
@@ -138,6 +144,17 @@ order = RebalanceOrder(
     current_value=3500000.0, # 현재: 350만원
     delta_value=1500000.0,   # 150만원 더 필요
     delta_weight=0.10        # 10% 비중 추가 필요
+)
+
+# 해외주식 주문 (SPY - NYSE)
+overseas_order = RebalanceOrder(
+    ticker="SPY",
+    action="buy",
+    target_value=800000.0,
+    current_value=500000.0,
+    delta_value=300000.0,
+    delta_weight=0.05,
+    exchange="NYSE"  # 해외주식 거래소 코드
 )
 ```
 

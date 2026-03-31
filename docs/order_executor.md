@@ -2,8 +2,23 @@
 
 ## 개요
 리밸런싱 계획을 실제 주문으로 변환하여 KIS API를 통해 실행하는 모듈입니다.
+국내주식, 해외주식(SPY 등), 비트코인 주문을 모두 지원합니다.
 
 ## 리팩토링 이력
+
+**v1.5 (Overseas Market Hours Check - 2026-04-01)**:
+- **해외 시장 시간 체크 기능 추가**
+- `market_hours` 모듈 연동 (`is_overseas_market_open`, `get_overseas_market_status`)
+- 해외 시장 휴장 시 주문 스킵 처리 (에러 발생 방지)
+- 스킵된 주문 로깅 및 결과 기록 기능
+
+**v1.4 (Overseas Stock Support - 2026-03-30)**:
+- **해외주식 주문 지원 추가** (SPY, AAPL 등 미국/홍콩/일본 주식)
+- `KISOverseasTrading` 모듈 통합
+- `RebalanceOrder.exchange` 필드를 통한 국내/해외주식 구분
+- `_execute_overseas_order()` 메서드 추가 (해외주식 전용)
+- `_execute_domestic_order()` 메서드 분리 (국내주식 전용)
+- 해외주식 모의투자 지정가 주문 지원 (모의투자 제약 사항)
 
 **v1.3 (KISTrading Integration - 2026-02-16)**:
 - KISTrading 모듈 직접 사용으로 변경
@@ -114,6 +129,42 @@ else:
     'action': str
 }
 ```
+
+---
+
+##### _execute_overseas_order(order) (내부)
+해외주식 주문을 실행합니다.
+
+**Parameters:**
+- `order` (RebalanceOrder): 주문 정보 (exchange 필드 필수)
+
+**Returns:**
+```python
+{
+    'success': bool,
+    'order_no': str,
+    'message': str,
+    'symbol': str,
+    'side': str,
+    'quantity': int,
+    'price': float
+}
+```
+
+**Note:**
+- 해외주식 모의투자는 **지정가 주문만 지원**합니다.
+- 지원 거래소: NASD(나스닥), NYSE(뉴욕), AMEX, SEHK(홍콩), TKSE(일본) 등
+
+---
+
+##### _execute_domestic_order(order) (내부)
+국내주식 주문을 실행합니다.
+
+**Parameters:**
+- `order` (RebalanceOrder): 주문 정보
+
+**Returns:**
+- 시장가/지정가 주문 결과
 
 ---
 
@@ -367,3 +418,62 @@ passed, _ = engine.check_guardrails(plan)
 executor = OrderExecutor(config, auth)
 result = executor.execute_plan(plan)
 ```
+
+## 변경 이력
+
+### v1.5 (2026-04-01) - 해외 시장 시간 체크 기능 추가
+
+**문제점:**
+- 한국 장 시간(09:00~15:30)에 해외주식(SPY 등) 주문 시도 시 API 에러 발생
+- 에러 코드: `40580000` (장종료), `40570000` (장시작전)
+
+**해결책:**
+- `market_hours.py` 모듈의 해외 시장 시간 체크 함수 사용
+- `_execute_overseas_order()` 메서드에서 주문 전 시장 시간 체크
+- 시장 휴장 시 에러 없이 스킵 처리
+
+**수정 내용:**
+1. `market_hours` 모듈 import 추가
+   ```python
+   from .market_hours import is_overseas_market_open, get_overseas_market_status, format_market_status
+   ```
+
+2. `_execute_overseas_order()` 메서드에 시장 시간 체크 로직 추가
+   ```python
+   if order.exchange:
+       market_status = get_overseas_market_status(order.exchange)
+       if not market_status.is_open:
+           logger.warning(f"Overseas market closed, skipping order...")
+           return {"success": False, "skipped": True, "market_closed": True, ...}
+   ```
+
+3. `_execute_order_live()` 메서드에서 스킵된 주문 처리
+   ```python
+   if order_result.get("skipped") and order_result.get("market_closed"):
+       logger.info(f"Skipped overseas order: market closed")
+       return  # 에러 없이 다음 주문으로 진행
+   ```
+
+**동작 방식:**
+- 해외주식 주문 시 해당 거래소 시장 시간 확인
+- 시장 휴장 시: 경고 로그 출력 후 스킵 (에러 발생하지 않음)
+- 시장 개장 시: 정상적으로 주문 실행
+
+**지원 거래소 및 시간:**
+| 거래소 | 시간대 | 장 시간 |
+|--------|--------|---------|
+| NYSE, NASD, AMEX | America/New_York | 09:30~16:00 |
+| SEHK (홍콩) | Asia/Hong_Kong | 09:30~16:00 |
+| TKSE (일본) | Asia/Tokyo | 09:00~15:00 |
+
+### v1.4 (2026-03-30)
+- 해외주식 주문 지원 추가 (SPY, AAPL 등)
+
+### v1.3 (2026-02-16)
+- KISTrading 모듈 직접 사용으로 변경
+
+### v1.2
+- Dry-run 모드 제거
+
+### v1.1
+- `kis_api_utils.py` 모듈 사용으로 리팩토링

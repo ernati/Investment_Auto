@@ -17,6 +17,7 @@ from .portfolio_models import RebalancePlan, ExecutionResult, RebalanceOrder
 from .kis_trading import KISTrading
 from .kis_overseas_trading import KISOverseasTrading
 from .upbit_api_client import UpbitClient, get_upbit_client
+from .market_hours import is_overseas_market_open, get_overseas_market_status, format_market_status
 
 
 logger = logging.getLogger(__name__)
@@ -216,6 +217,21 @@ class OrderExecutor:
             else:
                 order_result = self._execute_domestic_order(order)
             
+            # 해외 시장 휴장으로 스킵된 경우
+            if order_result.get("skipped") and order_result.get("market_closed"):
+                logger.info(
+                    f"Skipped overseas order for {order.ticker}: market closed "
+                    f"(exchange={order.exchange})"
+                )
+                # 스킵된 주문도 기록에 추가 (통계 목적)
+                result.executed_orders.append({
+                    **order_result,
+                    "symbol": order.ticker,
+                    "side": order.action,
+                    "quantity": order.estimated_quantity
+                })
+                return  # 에러 없이 다음 주문으로 진행
+            
             # 주문 성공
             if order_result.get("success"):
                 result.executed_orders.append(order_result)
@@ -283,6 +299,7 @@ class OrderExecutor:
         
         Note:
             해외주식 모의투자는 지정가 주문만 지원합니다.
+            해당 거래소 시장이 열려있지 않으면 주문을 스킵합니다.
         
         Args:
             order (RebalanceOrder): 주문 정보
@@ -290,6 +307,23 @@ class OrderExecutor:
         Returns:
             Dict: 주문 결과
         """
+        # 해외 거래소 시장 시간 체크
+        if order.exchange:
+            market_status = get_overseas_market_status(order.exchange)
+            if not market_status.is_open:
+                logger.warning(
+                    f"Overseas market closed, skipping order for {order.ticker}: "
+                    f"exchange={order.exchange}, {format_market_status(market_status)}"
+                )
+                return {
+                    "success": False,
+                    "order_no": "",
+                    "message": f"해외 시장 휴장: {order.exchange} ({market_status.status})",
+                    "data": {},
+                    "skipped": True,
+                    "market_closed": True
+                }
+        
         logger.info(
             f"Executing overseas order: {order.ticker} @ {order.exchange}, "
             f"action={order.action}, qty={order.estimated_quantity}"
