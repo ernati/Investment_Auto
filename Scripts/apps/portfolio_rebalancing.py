@@ -52,7 +52,7 @@ logger = logging.getLogger(__name__)
 class PortfolioRebalancingApp:
     """포트폴리오 자동 리밸런싱 애플리케이션"""
     
-    def __init__(self, skip_schedule_check: bool = False, env: str = None, enable_web: bool = True, web_port: int = 5000, db_enabled: bool = False):
+    def __init__(self, skip_schedule_check: bool = False, env: str = None, enable_web: bool = True, web_port: int = 5000, web_host: str = "127.0.0.1", db_enabled: bool = False):
         """
         애플리케이션 초기화
         
@@ -61,11 +61,13 @@ class PortfolioRebalancingApp:
             env (str): 환경 설정 ('real' 또는 'demo'), None이면 설정 파일에서 읽음
             enable_web (bool): 웹 서버 활성화 여부 (기본값: True)
             web_port (int): 웹 서버 포트 (기본값: 5000)
+            web_host (str): 웹 서버 호스트 (기본값: 127.0.0.1, 컨테이너는 0.0.0.0)
             db_enabled (bool): 데이터베이스 저장 활성화 여부 (기본값: False)
         """
         self.skip_schedule_check = skip_schedule_check
         self.enable_web = enable_web
         self.web_port = web_port
+        self.web_host = web_host
         self.db_enabled = db_enabled
         logger.info(f"Starting Portfolio Rebalancing Application (DB: {'enabled' if db_enabled else 'disabled'})")
         
@@ -161,11 +163,11 @@ class PortfolioRebalancingApp:
             try:
                 self.web_server = PortfolioWebServer(
                     port=self.web_port,
-                    host="127.0.0.1",
+                    host=self.web_host,
                     env=kis_env,
                     unified_fetcher=self.portfolio_fetcher  # KIS + Upbit 통합 페처 전달
                 )
-                logger.info(f"Web server initialized on port {self.web_port}")
+                logger.info(f"Web server initialized on {self.web_host}:{self.web_port}")
             except Exception as e:
                 logger.warning(f"Web server initialization failed: {e}")
                 self.web_server = None
@@ -497,6 +499,12 @@ def main():
         help='Web server port (default: 5000)'
     )
     parser.add_argument(
+        '--web-host',
+        type=str,
+        default='127.0.0.1',
+        help='Web server host (default: 127.0.0.1, use 0.0.0.0 for container)'
+    )
+    parser.add_argument(
         '--db-mode',
         action='store_true',
         help='Enable database logging and storage'
@@ -522,6 +530,7 @@ def main():
             env=env,
             enable_web=enable_web,
             web_port=args.web_port,
+            web_host=args.web_host,
             db_enabled=db_enabled
         )
         

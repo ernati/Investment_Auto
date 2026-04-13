@@ -83,6 +83,7 @@ spec:
             - --disable-web
             {{- end }}
             - --web-port={{ .Values.app.web.port }}
+            - --web-host=0.0.0.0
             {{- if .Values.app.dbMode }}
             - --db-mode
             {{- end }}
