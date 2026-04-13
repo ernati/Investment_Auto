@@ -7,7 +7,7 @@ spec:
   generators:
     # Git 저장소 기반 Generator
     - git:
-        repoURL: https://github.com/yourusername/Investment_Auto.git
+        repoURL: git@github.com:ernati/Investment_Auto.git
         revision: main
         directories:
           - path: deployment/helm
@@ -25,7 +25,7 @@ spec:
       project: investment-auto
       
       source:
-        repoURL: https://github.com/yourusername/Investment_Auto.git
+        repoURL: git@github.com:ernati/Investment_Auto.git
         targetRevision: main
         path: deployment/helm
         helm:

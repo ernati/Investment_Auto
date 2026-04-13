@@ -16,10 +16,16 @@ app:
   name: investment-auto
   replicaCount: 1
   
+  # Python 공식 이미지 사용 (Docker 빌드 불필요)
   image:
-    repository: ghcr.io/yourusername/investment-auto
-    tag: latest
-    pullPolicy: Always
+    repository: python
+    tag: "3.11-slim"
+    pullPolicy: IfNotPresent
+  
+  # Git 저장소 설정 (initContainer에서 clone)
+  git:
+    repository: https://github.com/ernati/Investment_Auto.git
+    branch: main
   
   # 실행 모드: once, schedule
   mode: schedule
@@ -202,6 +208,13 @@ securityContext: {}
 nodeSelector: {}
 tolerations: []
 affinity: {}
+
+# -----------------------------------------------------------------------------
+# 이미지 Pull Secret (private registry 사용 시에만 설정)
+# Python 공식 이미지 사용 시 불필요
+# -----------------------------------------------------------------------------
+imagePullSecrets: []
+# - name: my-registry-secret
 
 # -----------------------------------------------------------------------------
 # 환경변수 추가 설정

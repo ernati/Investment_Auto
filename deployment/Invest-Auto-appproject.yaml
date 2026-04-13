@@ -12,7 +12,7 @@ spec:
 
   # 허용된 소스 저장소
   sourceRepos:
-    - 'https://github.com/yourusername/Investment_Auto.git'
+    - 'git@github.com:ernati/Investment_Auto.git'
     # Bitnami Helm Chart 저장소 (PostgreSQL 의존성)
     - 'https://charts.bitnami.com/bitnami'
 

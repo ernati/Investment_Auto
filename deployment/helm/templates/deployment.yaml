@@ -28,18 +28,52 @@ spec:
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      
+      # Git clone + 의존성 설치를 위한 initContainer
+      initContainers:
+        - name: git-clone
+          image: "{{ .Values.app.image.repository }}:{{ .Values.app.image.tag }}"
+          imagePullPolicy: {{ .Values.app.image.pullPolicy }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              echo "📦 Installing git..."
+              apt-get update && apt-get install -y --no-install-recommends git libpq-dev gcc
+              
+              echo "📥 Cloning repository..."
+              git clone --depth 1 --branch {{ .Values.app.git.branch }} {{ .Values.app.git.repository }} /app
+              
+              echo "📚 Installing Python dependencies..."
+              pip install --no-cache-dir -r /app/requirements.txt
+              pip install --no-cache-dir psycopg2-binary pyjwt
+              
+              echo "✅ Initialization complete!"
+          volumeMounts:
+            - name: app-code
+              mountPath: /app
+            - name: pip-cache
+              mountPath: /root/.cache/pip
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      
       containers:
         - name: {{ .Chart.Name }}
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          image: "{{ .Values.app.image.repository }}:{{ .Values.app.image.tag | default .Chart.AppVersion }}"
+          image: "{{ .Values.app.image.repository }}:{{ .Values.app.image.tag }}"
           imagePullPolicy: {{ .Values.app.image.pullPolicy }}
-          command:
-            - python
-            - Scripts/apps/portfolio_rebalancing.py
+          workingDir: /app
+          command: ["python"]
           args:
+            - Scripts/apps/portfolio_rebalancing.py
             - --mode={{ .Values.app.mode }}
             - --interval={{ .Values.app.interval }}
             {{- if eq .Values.app.environment "demo" }}
@@ -127,6 +161,8 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
           volumeMounts:
+            - name: app-code
+              mountPath: /app
             - name: config-volume
               mountPath: /app/Config/database.json
               subPath: database.json
@@ -156,7 +192,12 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.app.resources | nindent 12 }}
+      
       volumes:
+        - name: app-code
+          emptyDir: {}
+        - name: pip-cache
+          emptyDir: {}
         - name: config-volume
           configMap:
             name: {{ include "investment-auto.configMapName" . }}
