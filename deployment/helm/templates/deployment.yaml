@@ -44,9 +44,9 @@ spec:
               echo "📥 Cloning repository..."
               git clone --depth 1 --branch {{ .Values.app.git.branch }} {{ .Values.app.git.repository }} /app
               
-              echo "📚 Installing Python dependencies..."
-              pip install --no-cache-dir -r /app/requirements.txt
-              pip install --no-cache-dir psycopg2-binary pyjwt
+              echo "📚 Installing Python dependencies to /app/libs..."
+              pip install --no-cache-dir --target=/app/libs -r /app/requirements.txt
+              pip install --no-cache-dir --target=/app/libs psycopg2-binary pyjwt
               
               echo "✅ Initialization complete!"
           volumeMounts:
@@ -91,6 +91,9 @@ spec:
               containerPort: {{ .Values.app.web.port }}
               protocol: TCP
           env:
+            # Python 패키지 경로 (initContainer에서 /app/libs에 설치)
+            - name: PYTHONPATH
+              value: "/app/libs:/app/Scripts"
             # Pod 정보
             - name: POD_NAME
               valueFrom:
