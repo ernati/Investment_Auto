@@ -33,10 +33,7 @@ spec:
             - name: POSTGRES_DB
               value: {{ .Values.officialPostgresql.auth.database | quote }}
             - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.officialPostgresql.auth.existingSecret }}
-                  key: {{ .Values.officialPostgresql.auth.secretKeys.passwordKey }}
+              value: {{ .Values.officialPostgresql.auth.password | quote }}
             - name: PGDATA
               value: /var/lib/postgresql/data/pgdata
           volumeMounts:

@@ -115,18 +115,18 @@ postgresql:
   enabled: false
 
 # 공식 PostgreSQL 이미지 사용 (권장)
+# 주의: 아래 auth 값은 Config/database.json과 반드시 일치해야 합니다.
+#       PostgreSQL 컨테이너 초기화 시 환경변수가 필수이므로 중복이 불가피합니다.
 officialPostgresql:
   enabled: true
   image:
     repository: postgres
     tag: "16-alpine"  # 공식 Docker Hub 이미지, 안정적
   auth:
-    username: appuser
-    database: appdb
-    existingSecret: investment-auto-db-secret
-    secretKeys:
-      postgresPasswordKey: postgres-password
-      passwordKey: password
+    # Config/database.json과 동일하게 설정
+    username: appuser          # database.json의 "user"
+    database: appdb            # database.json의 "name"
+    password: "temp1234"       # database.json의 "password"
   persistence:
     enabled: true
     size: 5Gi
@@ -143,63 +143,21 @@ officialPostgresql:
     port: 5432
 
 # -----------------------------------------------------------------------------
-# 커스텀 PostgreSQL (Zalando Operator 사용 시) - 현재 미사용
-# postgresql.enabled: false로 설정하고 이 섹션 사용
-# -----------------------------------------------------------------------------
-zalandoPostgresql:
-  enabled: false
-  teamId: acid
-  numberOfInstances: 1
-  volume:
-    size: 5Gi
-  users:
-    appuser: []
-  databases:
-    appdb: appuser
-  version: "16"
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-
-# -----------------------------------------------------------------------------
-# ConfigMap 설정
+# ConfigMap 설정 (스케줄러 설정만 - DB 설정은 Config/database.json에서 로드)
 # -----------------------------------------------------------------------------
 config:
-  # KIS API 설정 (Secret에서 관리하므로 여기선 기타 설정만)
   scheduler:
     checkInterval: 60
     retryCount: 3
     retryDelay: 5
-  
-  database:
-    host: ""  # 자동 설정됨
-    port: 5432
-    name: appdb
-    user: appuser
-    sslmode: prefer
-    connectTimeout: 5
-    retryMax: 3
-    retryBackoff: 0.5
 
 # -----------------------------------------------------------------------------
-# Secret 설정
+# Secret 설정 (불필요 - Config 폴더에서 설정 로드)
 # -----------------------------------------------------------------------------
+# Config 폴더의 config.json, database.json 등에서 모든 설정을 로드하므로
+# Kubernetes Secret은 사용하지 않습니다.
 secrets:
-  # KIS API 키 (base64 인코딩 필요)
-  kis:
-    appKey: ""
-    appSecret: ""
-  
-  # Upbit API 키 (선택)
-  upbit:
-    accessKey: ""
-    secretKey: ""
-  
-  # 데이터베이스 비밀번호
-  database:
-    password: ""
-    postgresPassword: ""
+  enabled: false
 
 # -----------------------------------------------------------------------------
 # ServiceAccount 설정

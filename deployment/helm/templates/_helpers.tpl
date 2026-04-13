@@ -60,34 +60,10 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
-Database host
+Database host - 공식 PostgreSQL StatefulSet 서비스 이름
 */}}
 {{- define "investment-auto.databaseHost" -}}
-{{- if .Values.postgresql.enabled }}
-{{- printf "%s-postgresql" .Release.Name }}
-{{- else if .Values.zalandoPostgresql.enabled }}
-{{- printf "app-db.%s.svc.cluster.local" .Release.Namespace }}
-{{- else }}
-{{- .Values.config.database.host }}
-{{- end }}
-{{- end }}
-
-{{/*
-Database secret name
-*/}}
-{{- define "investment-auto.databaseSecretName" -}}
-{{- if .Values.postgresql.enabled }}
-{{- printf "%s-db-secret" (include "investment-auto.fullname" .) }}
-{{- else }}
-{{- printf "%s-db-secret" (include "investment-auto.fullname" .) }}
-{{- end }}
-{{- end }}
-
-{{/*
-KIS secret name
-*/}}
-{{- define "investment-auto.kisSecretName" -}}
-{{- printf "%s-kis-secret" (include "investment-auto.fullname" .) }}
+{{- printf "%s-postgresql" (include "investment-auto.fullname" .) }}
 {{- end }}
 
 {{/*
