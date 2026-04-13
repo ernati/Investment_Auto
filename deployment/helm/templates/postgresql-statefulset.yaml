@@ -1,0 +1,81 @@
+{{- if .Values.officialPostgresql.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "investment-auto.fullname" . }}-postgresql
+  labels:
+    {{- include "investment-auto.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+spec:
+  serviceName: {{ include "investment-auto.fullname" . }}-postgresql-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "investment-auto.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: database
+  template:
+    metadata:
+      labels:
+        {{- include "investment-auto.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: database
+    spec:
+      containers:
+        - name: postgresql
+          image: "{{ .Values.officialPostgresql.image.repository }}:{{ .Values.officialPostgresql.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: tcp-postgresql
+              containerPort: 5432
+              protocol: TCP
+          env:
+            - name: POSTGRES_USER
+              value: {{ .Values.officialPostgresql.auth.username | quote }}
+            - name: POSTGRES_DB
+              value: {{ .Values.officialPostgresql.auth.database | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.officialPostgresql.auth.existingSecret }}
+                  key: {{ .Values.officialPostgresql.auth.secretKeys.passwordKey }}
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - exec pg_isready -U {{ .Values.officialPostgresql.auth.username | quote }} -d {{ .Values.officialPostgresql.auth.database | quote }} -h 127.0.0.1 -p 5432
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - exec pg_isready -U {{ .Values.officialPostgresql.auth.username | quote }} -d {{ .Values.officialPostgresql.auth.database | quote }} -h 127.0.0.1 -p 5432
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.officialPostgresql.resources | nindent 12 }}
+  {{- if .Values.officialPostgresql.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        {{- if .Values.officialPostgresql.persistence.storageClass }}
+        storageClassName: {{ .Values.officialPostgresql.persistence.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.officialPostgresql.persistence.size }}
+  {{- end }}
+{{- end }}

@@ -15,9 +15,12 @@ maintainers:
 home: https://github.com/yourusername/Investment_Auto
 sources:
   - https://github.com/yourusername/Investment_Auto
-dependencies:
-  - name: postgresql
-    version: "12.x.x"
-    repository: https://charts.bitnami.com/bitnami
-    condition: postgresql.enabled
-    alias: postgresql
+
+# Bitnami PostgreSQL 의존성 비활성화 (이미지 태그 관리 문제)
+# 대신 공식 postgres:16-alpine 이미지를 직접 사용합니다.
+# dependencies:
+#   - name: postgresql
+#     version: "12.x.x"
+#     repository: https://charts.bitnami.com/bitnami
+#     condition: postgresql.enabled
+#     alias: postgresql

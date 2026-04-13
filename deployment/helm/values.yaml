@@ -108,47 +108,42 @@ ingress:
         - investment.yourdomain.com
 
 # -----------------------------------------------------------------------------
-# PostgreSQL 설정 (Bitnami Helm Chart)
+# PostgreSQL 설정
 # -----------------------------------------------------------------------------
+# Bitnami Helm Chart 사용 (비활성화 - 이미지 태그 관리 어려움)
 postgresql:
+  enabled: false
+
+# 공식 PostgreSQL 이미지 사용 (권장)
+officialPostgresql:
   enabled: true
-  
-  # 이미지 설정 (최신 안정 버전 사용)
   image:
-    registry: docker.io
-    repository: bitnami/postgresql
-    tag: "16.4.0-debian-12-r23"  # 2024년 최신 안정 버전
-  
+    repository: postgres
+    tag: "16-alpine"  # 공식 Docker Hub 이미지, 안정적
   auth:
     username: appuser
-    password: ""  # Secret에서 관리
     database: appdb
     existingSecret: investment-auto-db-secret
     secretKeys:
-      adminPasswordKey: postgres-password
-      userPasswordKey: password
-  
-  primary:
-    persistence:
-      enabled: true
-      size: 5Gi
-      storageClass: ""  # 클러스터 기본 storageClass 사용
-    
-    resources:
-      requests:
-        cpu: 100m
-        memory: 256Mi
-      limits:
-        cpu: 500m
-        memory: 512Mi
-  
-  # 서비스 설정
+      postgresPasswordKey: postgres-password
+      passwordKey: password
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
   service:
     type: ClusterIP
     port: 5432
 
 # -----------------------------------------------------------------------------
-# 커스텀 PostgreSQL (Zalando Operator 사용 시)
+# 커스텀 PostgreSQL (Zalando Operator 사용 시) - 현재 미사용
 # postgresql.enabled: false로 설정하고 이 섹션 사용
 # -----------------------------------------------------------------------------
 zalandoPostgresql:

@@ -1,0 +1,38 @@
+{{- if .Values.officialPostgresql.enabled }}
+# Headless Service for StatefulSet
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "investment-auto.fullname" . }}-postgresql-headless
+  labels:
+    {{- include "investment-auto.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: tcp-postgresql
+      port: {{ .Values.officialPostgresql.service.port }}
+      targetPort: tcp-postgresql
+  selector:
+    {{- include "investment-auto.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+---
+# ClusterIP Service for application access
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "investment-auto.fullname" . }}-postgresql
+  labels:
+    {{- include "investment-auto.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+spec:
+  type: {{ .Values.officialPostgresql.service.type }}
+  ports:
+    - name: tcp-postgresql
+      port: {{ .Values.officialPostgresql.service.port }}
+      targetPort: tcp-postgresql
+  selector:
+    {{- include "investment-auto.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+{{- end }}
