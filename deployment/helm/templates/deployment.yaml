@@ -91,63 +91,6 @@ spec:
               containerPort: {{ .Values.app.web.port }}
               protocol: TCP
           env:
-            # 데이터베이스 환경변수
-            - name: DB_HOST
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ include "investment-auto.configMapName" . }}
-                  key: DB_HOST
-            - name: DB_PORT
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ include "investment-auto.configMapName" . }}
-                  key: DB_PORT
-            - name: DB_NAME
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ include "investment-auto.configMapName" . }}
-                  key: DB_NAME
-            - name: DB_USER
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ include "investment-auto.configMapName" . }}
-                  key: DB_USER
-            - name: DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "investment-auto.databaseSecretName" . }}
-                  key: password
-            - name: DB_SSLMODE
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ include "investment-auto.configMapName" . }}
-                  key: DB_SSLMODE
-            # KIS API 환경변수
-            - name: KIS_APP_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "investment-auto.kisSecretName" . }}
-                  key: KIS_APP_KEY
-                  optional: true
-            - name: KIS_APP_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "investment-auto.kisSecretName" . }}
-                  key: KIS_APP_SECRET
-                  optional: true
-            # Upbit API 환경변수 (선택)
-            - name: UPBIT_ACCESS_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "investment-auto.kisSecretName" . }}
-                  key: UPBIT_ACCESS_KEY
-                  optional: true
-            - name: UPBIT_SECRET_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "investment-auto.kisSecretName" . }}
-                  key: UPBIT_SECRET_KEY
-                  optional: true
             # Pod 정보
             - name: POD_NAME
               valueFrom:
@@ -163,10 +106,12 @@ spec:
           volumeMounts:
             - name: app-code
               mountPath: /app
-            - name: config-volume
-              mountPath: /app/Config/database.json
-              subPath: database.json
+            - name: host-config
+              mountPath: /app/Config
               readOnly: true
+            - name: host-demo-data
+              mountPath: /app/Scripts/modules/demo_data
+              readOnly: false
             {{- with .Values.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -198,9 +143,14 @@ spec:
           emptyDir: {}
         - name: pip-cache
           emptyDir: {}
-        - name: config-volume
-          configMap:
-            name: {{ include "investment-auto.configMapName" . }}
+        - name: host-config
+          hostPath:
+            path: {{ .Values.app.hostConfig.path }}
+            type: Directory
+        - name: host-demo-data
+          hostPath:
+            path: {{ .Values.app.hostDemoData.path }}
+            type: DirectoryOrCreate
         {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

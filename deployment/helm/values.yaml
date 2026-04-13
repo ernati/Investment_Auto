@@ -27,6 +27,15 @@ app:
     repository: https://github.com/ernati/Investment_Auto.git
     branch: main
   
+  # 호스트 Config 폴더 마운트 설정
+  # 운영 서버의 Config 폴더를 Pod에 마운트
+  hostConfig:
+    path: /home/ernati/Services/Investment_Auto/Config
+  
+  # 호스트 demo_data 폴더 마운트 설정 (현금/포지션 파일)
+  hostDemoData:
+    path: /home/ernati/Services/Investment_Auto/Scripts/modules/demo_data
+  
   # 실행 모드: once, schedule
   mode: schedule
   
