@@ -117,7 +117,7 @@ postgresql:
   image:
     registry: docker.io
     repository: bitnami/postgresql
-    tag: "16"  # 최신 PostgreSQL 16 사용
+    tag: "16.4.0-debian-12-r23"  # 2024년 최신 안정 버전
   
   auth:
     username: appuser
