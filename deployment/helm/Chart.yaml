@@ -1,0 +1,23 @@
+apiVersion: v2
+name: investment-auto
+description: Investment Auto - 포트폴리오 자동 리밸런싱 시스템
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - investment
+  - portfolio
+  - rebalancing
+  - trading
+  - automation
+maintainers:
+  - name: Investment Auto Team
+home: https://github.com/yourusername/Investment_Auto
+sources:
+  - https://github.com/yourusername/Investment_Auto
+dependencies:
+  - name: postgresql
+    version: "12.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+    alias: postgresql

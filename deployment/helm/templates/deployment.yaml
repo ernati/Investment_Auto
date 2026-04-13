@@ -1,0 +1,177 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "investment-auto.fullname" . }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "investment-auto.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.app.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "investment-auto.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "investment-auto.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "investment-auto.serviceAccountName" . }}
+      {{- end }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ .Values.app.image.repository }}:{{ .Values.app.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.app.image.pullPolicy }}
+          command:
+            - python
+            - Scripts/apps/portfolio_rebalancing.py
+          args:
+            - --mode={{ .Values.app.mode }}
+            - --interval={{ .Values.app.interval }}
+            {{- if eq .Values.app.environment "demo" }}
+            - --demo
+            {{- end }}
+            {{- if not .Values.app.web.enabled }}
+            - --disable-web
+            {{- end }}
+            - --web-port={{ .Values.app.web.port }}
+            {{- if .Values.app.dbMode }}
+            - --db-mode
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.app.web.port }}
+              protocol: TCP
+          env:
+            # 데이터베이스 환경변수
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "investment-auto.configMapName" . }}
+                  key: DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "investment-auto.configMapName" . }}
+                  key: DB_PORT
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "investment-auto.configMapName" . }}
+                  key: DB_NAME
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "investment-auto.configMapName" . }}
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "investment-auto.databaseSecretName" . }}
+                  key: password
+            - name: DB_SSLMODE
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "investment-auto.configMapName" . }}
+                  key: DB_SSLMODE
+            # KIS API 환경변수
+            - name: KIS_APP_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "investment-auto.kisSecretName" . }}
+                  key: KIS_APP_KEY
+                  optional: true
+            - name: KIS_APP_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "investment-auto.kisSecretName" . }}
+                  key: KIS_APP_SECRET
+                  optional: true
+            # Upbit API 환경변수 (선택)
+            - name: UPBIT_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "investment-auto.kisSecretName" . }}
+                  key: UPBIT_ACCESS_KEY
+                  optional: true
+            - name: UPBIT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "investment-auto.kisSecretName" . }}
+                  key: UPBIT_SECRET_KEY
+                  optional: true
+            # Pod 정보
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            {{- with .Values.extraEnvVars }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          volumeMounts:
+            - name: config-volume
+              mountPath: /app/Config/database.json
+              subPath: database.json
+              readOnly: true
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- if .Values.app.livenessProbe.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.app.livenessProbe.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.app.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.app.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.app.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.app.livenessProbe.failureThreshold }}
+          {{- end }}
+          {{- if .Values.app.readinessProbe.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.app.readinessProbe.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.app.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.app.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.app.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.app.readinessProbe.failureThreshold }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.app.resources | nindent 12 }}
+      volumes:
+        - name: config-volume
+          configMap:
+            name: {{ include "investment-auto.configMapName" . }}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

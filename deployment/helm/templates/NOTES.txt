@@ -1,0 +1,10 @@
+# Investment Auto Helm Chart 사용 참고사항
+
+## 테스트용 템플릿 렌더링
+# helm template investment-auto ./deployment/helm -f ./deployment/helm/values.yaml
+
+## 배포 명령어
+# helm install investment-auto ./deployment/helm -f ./deployment/helm/values.yaml -n investment-auto --create-namespace
+
+## 업그레이드 명령어
+# helm upgrade investment-auto ./deployment/helm -f ./deployment/helm/values.yaml -n investment-auto

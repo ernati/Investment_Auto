@@ -1,0 +1,19 @@
+# Investment Auto Helm Chart
+
+## .helmignore
+# Patterns to ignore when building packages.
+# This supports shell glob matching, relative path matching, and negation (prefixed with !)
+*.pem
+*.DS_Store
+*.git
+*.gitignore
+*.bzr
+*.bzrignore
+*.hg
+*.hgignore
+*.svn
+*.swp
+*.log
+*.pyc
+__pycache__/
+.env

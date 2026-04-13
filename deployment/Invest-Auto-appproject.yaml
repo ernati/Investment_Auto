@@ -1,0 +1,78 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: investment-auto
+  namespace: argocd
+  # Finalizer를 추가하면 프로젝트 삭제 시 연관된 모든 애플리케이션이 먼저 삭제됩니다.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  # 프로젝트 설명
+  description: Investment Auto - 포트폴리오 자동 리밸런싱 시스템
+
+  # 허용된 소스 저장소
+  sourceRepos:
+    - 'https://github.com/yourusername/Investment_Auto.git'
+    # Bitnami Helm Chart 저장소 (PostgreSQL 의존성)
+    - 'https://charts.bitnami.com/bitnami'
+
+  # 허용된 배포 대상 (클러스터 및 네임스페이스)
+  destinations:
+    # 메인 애플리케이션 네임스페이스
+    - namespace: investment-auto
+      server: https://kubernetes.default.svc
+    # 데이터베이스 네임스페이스 (Zalando Operator 사용 시)
+    - namespace: db
+      server: https://kubernetes.default.svc
+
+  # 클러스터 리소스 허용 목록
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+    - group: 'networking.k8s.io'
+      kind: IngressClass
+
+  # 네임스페이스 리소스 허용 목록 (기본: 모두 허용)
+  namespaceResourceWhitelist:
+    - group: ''
+      kind: ConfigMap
+    - group: ''
+      kind: Secret
+    - group: ''
+      kind: Service
+    - group: ''
+      kind: ServiceAccount
+    - group: ''
+      kind: PersistentVolumeClaim
+    - group: 'apps'
+      kind: Deployment
+    - group: 'apps'
+      kind: StatefulSet
+    - group: 'batch'
+      kind: Job
+    - group: 'batch'
+      kind: CronJob
+    - group: 'networking.k8s.io'
+      kind: Ingress
+    - group: 'acid.zalan.do'
+      kind: postgresql
+
+  # 프로젝트 역할 정의 (RBAC)
+  roles:
+    - name: developer
+      description: Developer access
+      policies:
+        - p, proj:investment-auto:developer, applications, get, investment-auto/*, allow
+        - p, proj:investment-auto:developer, applications, sync, investment-auto/*, allow
+        - p, proj:investment-auto:developer, logs, get, investment-auto/*, allow
+      groups:
+        - investment-auto-developers
+
+    - name: admin
+      description: Admin access
+      policies:
+        - p, proj:investment-auto:admin, applications, *, investment-auto/*, allow
+        - p, proj:investment-auto:admin, logs, get, investment-auto/*, allow
+        - p, proj:investment-auto:admin, exec, create, investment-auto/*, allow
+      groups:
+        - investment-auto-admins

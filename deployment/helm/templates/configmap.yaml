@@ -1,0 +1,69 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "investment-auto.configMapName" . }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "investment-auto.labels" . | nindent 4 }}
+data:
+  # 애플리케이션 설정
+  APP_MODE: {{ .Values.app.mode | quote }}
+  APP_INTERVAL: {{ .Values.app.interval | quote }}
+  APP_ENVIRONMENT: {{ .Values.app.environment | quote }}
+  WEB_ENABLED: {{ .Values.app.web.enabled | quote }}
+  WEB_PORT: {{ .Values.app.web.port | quote }}
+  DB_MODE: {{ .Values.app.dbMode | quote }}
+  
+  # 데이터베이스 설정
+  DB_HOST: {{ include "investment-auto.databaseHost" . | quote }}
+  DB_PORT: {{ .Values.config.database.port | quote }}
+  DB_NAME: {{ .Values.config.database.name | quote }}
+  DB_USER: {{ .Values.config.database.user | quote }}
+  DB_SSLMODE: {{ .Values.config.database.sslmode | quote }}
+  DB_CONNECT_TIMEOUT: {{ .Values.config.database.connectTimeout | quote }}
+  DB_RETRY_MAX: {{ .Values.config.database.retryMax | quote }}
+  DB_RETRY_BACKOFF: {{ .Values.config.database.retryBackoff | quote }}
+  
+  # 스케줄러 설정
+  SCHEDULER_CHECK_INTERVAL: {{ .Values.config.scheduler.checkInterval | quote }}
+  SCHEDULER_RETRY_COUNT: {{ .Values.config.scheduler.retryCount | quote }}
+  SCHEDULER_RETRY_DELAY: {{ .Values.config.scheduler.retryDelay | quote }}
+  
+  # database.json 파일 형식 (마운트용)
+  database.json: |
+    {
+        "database": {
+            "host": {{ include "investment-auto.databaseHost" . | quote }},
+            "port": {{ .Values.config.database.port }},
+            "name": {{ .Values.config.database.name | quote }},
+            "user": {{ .Values.config.database.user | quote }},
+            "password": "",
+            "sslmode": {{ .Values.config.database.sslmode | quote }},
+            "connect_timeout": {{ .Values.config.database.connectTimeout }},
+            "retry_max": {{ .Values.config.database.retryMax }},
+            "retry_backoff": {{ .Values.config.database.retryBackoff }}
+        },
+        "table_config": {
+            "trading_history": {
+                "enabled": true,
+                "retention_days": 365
+            },
+            "rebalancing_logs": {
+                "enabled": true,
+                "retention_days": 365
+            },
+            "portfolio_snapshots": {
+                "enabled": true,
+                "retention_days": 90
+            },
+            "system_logs": {
+                "enabled": true,
+                "retention_days": 30
+            }
+        },
+        "logging": {
+            "level": "INFO",
+            "enable_query_log": false,
+            "max_query_length": 1000
+        }
+    }

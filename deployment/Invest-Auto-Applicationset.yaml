@@ -1,0 +1,82 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: investment-auto
+  namespace: argocd
+spec:
+  generators:
+    # Git 저장소 기반 Generator
+    - git:
+        repoURL: https://github.com/yourusername/Investment_Auto.git
+        revision: main
+        directories:
+          - path: deployment/helm
+
+  template:
+    metadata:
+      name: 'investment-auto'
+      namespace: argocd
+      labels:
+        app: investment-auto
+        team: investment
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: investment-auto
+      
+      source:
+        repoURL: https://github.com/yourusername/Investment_Auto.git
+        targetRevision: main
+        path: deployment/helm
+        helm:
+          valueFiles:
+            - values.yaml
+          # 배포 환경별 values 파일 오버라이드 (선택)
+          # - values-prod.yaml
+          
+          # Helm 파라미터 오버라이드 (선택)
+          parameters: []
+          # - name: app.replicaCount
+          #   value: "2"
+          # - name: ingress.hosts[0].host
+          #   value: "investment.yourdomain.com"
+
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: investment-auto
+      
+      syncPolicy:
+        automated:
+          # 자동 Prune: Git에서 삭제된 리소스를 클러스터에서도 삭제
+          prune: true
+          # 자동 Self-Heal: 클러스터 상태가 Git과 다르면 자동 복구
+          selfHeal: true
+          # Prune 시 리소스 보호를 위한 finalizer 사용
+          allowEmpty: false
+        
+        syncOptions:
+          # 네임스페이스가 없으면 자동 생성
+          - CreateNamespace=true
+          # Server-Side Apply 사용 (더 안전한 리소스 관리)
+          - ServerSideApply=true
+          # Prune 전에 모든 리소스가 동기화될 때까지 대기
+          - PrunePropagationPolicy=foreground
+          # 리소스 적용 순서 지정
+          - ApplyOutOfSyncOnly=true
+        
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+      
+      # Health 체크 커스터마이징
+      ignoreDifferences:
+        - group: apps
+          kind: Deployment
+          jsonPointers:
+            - /spec/replicas
+      
+      # 리소스 추적 방법 설정
+      revisionHistoryLimit: 3
