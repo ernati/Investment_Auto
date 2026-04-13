@@ -113,6 +113,12 @@ ingress:
 postgresql:
   enabled: true
   
+  # 이미지 설정 (최신 안정 버전 사용)
+  image:
+    registry: docker.io
+    repository: bitnami/postgresql
+    tag: "16"  # 최신 PostgreSQL 16 사용
+  
   auth:
     username: appuser
     password: ""  # Secret에서 관리
