@@ -65,7 +65,7 @@ app:
   # 라이브니스/레디니스 프로브
   livenessProbe:
     enabled: true
-    path: /api/health
+    path: /health
     initialDelaySeconds: 30
     periodSeconds: 30
     timeoutSeconds: 5
@@ -73,7 +73,7 @@ app:
   
   readinessProbe:
     enabled: true
-    path: /api/health
+    path: /health
     initialDelaySeconds: 15
     periodSeconds: 10
     timeoutSeconds: 5
