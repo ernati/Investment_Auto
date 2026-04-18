@@ -149,7 +149,7 @@ class PortfolioRebalancingApp:
         self.scheduler = PortfolioScheduler(self.config)
         self.rebalancing_engine = RebalancingEngine(self.config)
         
-        # 주문 실행기 초기화 (Upbit 클라이언트 포함)
+        # 주문 실행기 초기화 (Upbit 클라이언트 포함) — db_manager는 나중에 설정
         self.order_executor = OrderExecutor(
             self.config, 
             self.kis_auth, 
@@ -190,6 +190,9 @@ class PortfolioRebalancingApp:
             except Exception as e:
                 logger.warning(f"Database initialization failed: {e}")
                 self.db_manager = None
+        
+        # db_manager를 order_executor에 전달
+        self.order_executor.db_manager = self.db_manager
 
         # 장 시간 체크 설정 (기본: 활성화)
         self.market_hours_enabled = self.config.get_basic(
@@ -246,6 +249,16 @@ class PortfolioRebalancingApp:
             
             if not plan.should_rebalance:
                 logger.info(f"Rebalancing not needed: {plan.rebalance_reason}")
+                if self.db_manager:
+                    try:
+                        self.db_manager.save_system_log(SystemLogRecord(
+                            level='INFO',
+                            module='rebalancing',
+                            message=f"Rebalancing skipped: {plan.rebalance_reason}",
+                            environment=self.kis_auth.env
+                        ))
+                    except Exception as log_err:
+                        logger.error(f"Failed to save skip log to DB: {log_err}")
                 return False
             
             # 4. 가드레일 적용 (한도 초과 시 스킵 대신 점진적 조정)
@@ -272,14 +285,26 @@ class PortfolioRebalancingApp:
             else:
                 logger.error(f"Plan execution failed: {result.error_message}")
                 
-                # 실패 시에도 리밸런싱 로그 저장
+                # 실패 시에도 DB 저장 (실패 주문 trading_history + 리밸런싱 로그)
                 if self.db_manager:
-                    self._save_rebalancing_log(portfolio_snapshot.portfolio_id, adjusted_plan, result)
+                    self._save_to_database(portfolio_snapshot, adjusted_plan, result)
                 
                 return False
         
         except Exception as e:
             logger.error(f"Error in rebalancing cycle: {e}", exc_info=True)
+            if self.db_manager:
+                try:
+                    import traceback
+                    self.db_manager.save_system_log(SystemLogRecord(
+                        level='ERROR',
+                        module='rebalancing',
+                        message=f"Rebalancing cycle exception: {e}",
+                        environment=self.kis_auth.env,
+                        extra_data={"traceback": traceback.format_exc()}
+                    ))
+                except Exception as log_err:
+                    logger.error(f"Failed to save exception log to DB: {log_err}")
             return False
     
     def run_scheduler(self, check_interval: int = 60) -> None:
@@ -378,6 +403,36 @@ class PortfolioRebalancingApp:
                     environment=env
                 )
                 self.db_manager.save_trading_history(trading_record)
+            
+            # 실패한 주문 저장 (plan.orders 중 executed_orders에 없는 주문)
+            executed_symbols_sides = set(
+                (
+                    (o.get('symbol', '') if isinstance(o, dict) else getattr(o, 'symbol', '')),
+                    (o.get('side', '') if isinstance(o, dict) else getattr(o, 'side', ''))
+                )
+                for o in result.executed_orders
+            )
+            if not result.succeeded and plan and hasattr(plan, 'orders'):
+                for order in plan.orders:
+                    ticker = getattr(order, 'ticker', '')
+                    action = getattr(order, 'action', '')
+                    if (ticker, action) not in executed_symbols_sides:
+                        try:
+                            failed_record = TradingHistoryRecord(
+                                portfolio_id=portfolio_snapshot.portfolio_id,
+                                symbol=ticker,
+                                order_type='buy' if action == 'buy' else 'sell',
+                                quantity=float(getattr(order, 'estimated_quantity', 0) or 0),
+                                price=0.0,  # 실패 시 체결가 없음
+                                total_amount=0.0,
+                                commission=0.0,
+                                order_id='',
+                                status='failed',
+                                environment=env
+                            )
+                            self.db_manager.save_trading_history(failed_record)
+                        except Exception as failed_save_err:
+                            logger.error(f"Failed to save failed order record for {ticker}: {failed_save_err}")
             
             # 리밸런싱 로그 저장
             self._save_rebalancing_log(portfolio_snapshot.portfolio_id, plan, result)

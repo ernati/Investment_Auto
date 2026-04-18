@@ -8,7 +8,7 @@ Dry-run 모드도 지원
 """
 
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from datetime import datetime
 
 from .config_loader import PortfolioConfigLoader
@@ -35,7 +35,8 @@ class OrderExecutor:
         config_loader: PortfolioConfigLoader,
         kis_auth: KISAuth,
         upbit_client: Optional[UpbitClient] = None,
-        env: str = "demo"
+        env: str = "demo",
+        db_manager: Optional[Any] = None
     ):
         """
         Args:
@@ -43,11 +44,13 @@ class OrderExecutor:
             kis_auth (KISAuth): KIS 인증 정보
             upbit_client (UpbitClient, optional): Upbit 클라이언트
             env (str): 환경 설정 ('real' 또는 'demo')
+            db_manager (optional): 데이터베이스 매니저 (에러 로깅용)
         """
         self.config = config_loader
         self.kis_auth = kis_auth
         self.base_url = kis_auth.base_url
         self.env = env
+        self.db_manager = db_manager
         
         # KISTrading 인스턴스 생성 (국내주식)
         self.trading = KISTrading(kis_auth)
@@ -110,6 +113,18 @@ class OrderExecutor:
             result.succeeded = False
             result.error_message = str(e)
             logger.error(f"Error executing plan: {e}")
+            if self.db_manager:
+                try:
+                    from .db_models import SystemLogRecord
+                    self.db_manager.save_system_log(SystemLogRecord(
+                        level='ERROR',
+                        module='order_executor',
+                        message=f"Plan execution error: {e}",
+                        environment=self.env,
+                        extra_data={"portfolio_id": result.portfolio_id, "error": str(e)}
+                    ))
+                except Exception as log_err:
+                    logger.error(f"Failed to save plan execution error to DB: {log_err}")
         
         return result
     
@@ -255,6 +270,23 @@ class OrderExecutor:
                     error_msg = f"Order placement failed: {clean_msg}"
                     
             logger.error(f"Error placing order for {order.ticker}: {error_msg}")
+            if self.db_manager:
+                try:
+                    from .db_models import SystemLogRecord
+                    self.db_manager.save_system_log(SystemLogRecord(
+                        level='ERROR',
+                        module='order_executor',
+                        message=f"Order failed for {order.ticker}: {error_msg}",
+                        environment=self.env,
+                        extra_data={
+                            "ticker": order.ticker,
+                            "action": order.action,
+                            "quantity": getattr(order, 'estimated_quantity', 0),
+                            "error": error_msg
+                        }
+                    ))
+                except Exception as log_err:
+                    logger.error(f"Failed to save order error to DB: {log_err}")
             raise RuntimeError(error_msg)
     
     def _execute_domestic_order(self, order: RebalanceOrder) -> Dict:

@@ -300,12 +300,9 @@ class DatabaseManager:
                     return True
         
         except DatabaseError as e:
-            # 테이블 관련 에러는 프로그램 종료
-            if e.pgcode == UNDEFINED_TABLE:
-                logger.error(f"System logs table not found. Database initialization may have failed: {e}")
-                sys.exit(1)
+            # system_logs 저장 실패는 프로그램을 종료하지 않고 로깅만 함
             logger.error(f"Database error while saving system log: {e}")
-            sys.exit(1)
+            return False
         except Exception as e:
             logger.error(f"Failed to save system log: {e}")
             return False

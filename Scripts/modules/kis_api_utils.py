@@ -138,6 +138,24 @@ def validate_api_response(
         return False, error_msg
 
 
+def _save_api_error_to_db(db_manager: Optional[Any], kis_auth: Optional[KISAuth], context: str, error_msg: str) -> None:
+    """KIS API 최종 실패를 system_logs DB에 기록합니다. 실패해도 예외를 발생시키지 않습니다."""
+    if db_manager is None:
+        return
+    try:
+        from .db_models import SystemLogRecord
+        env = kis_auth.env if kis_auth else "unknown"
+        db_manager.save_system_log(SystemLogRecord(
+            level='ERROR',
+            module='kis_api',
+            message=f"{context}: {error_msg}",
+            environment=env,
+            extra_data={"context": context, "error": error_msg}
+        ))
+    except Exception as e:
+        logger.error(f"Failed to save API error to DB: {e}")
+
+
 def execute_api_request_with_retry(
     method: str,
     url: str,
@@ -148,7 +166,8 @@ def execute_api_request_with_retry(
     context: str = "KIS API",
     kis_auth: Optional[KISAuth] = None,
     max_retries: int = 3,
-    base_delay: float = 1.0
+    base_delay: float = 1.0,
+    db_manager: Optional[Any] = None
 ) -> Dict[str, Any]:
     """
     Rate limiting과 백오프 전략이 적용된 KIS API 요청을 실행합니다.
@@ -223,6 +242,7 @@ def execute_api_request_with_retry(
                     if attempt < max_retries:
                         logger.warning(f"{context}: Rate limit hit, will retry...")
                         continue
+                _save_api_error_to_db(db_manager, kis_auth, context, error_msg)
                 raise RuntimeError(f"{context} returned error: {error_msg}")
             
             return data
@@ -230,10 +250,12 @@ def execute_api_request_with_retry(
         except requests.exceptions.Timeout:
             logger.error(f"{context}: Request timeout after {timeout}s (attempt {attempt + 1})")
             if attempt >= max_retries:
+                _save_api_error_to_db(db_manager, kis_auth, context, f"Request timeout after {timeout}s")
                 raise
         except requests.exceptions.ConnectionError as e:
             logger.error(f"{context}: Connection error - {e} (attempt {attempt + 1})")
             if attempt >= max_retries:
+                _save_api_error_to_db(db_manager, kis_auth, context, f"Connection error: {e}")
                 raise
         except requests.exceptions.HTTPError as e:
             # HTTP 에러 시에도 response body에서 KIS API 에러 메시지 추출 시도
@@ -266,19 +288,23 @@ def execute_api_request_with_retry(
                         
                         logger.error(f"{context}: KIS API error - {detailed_error} (HTTP {response.status_code})")
                         if attempt >= max_retries:
+                            _save_api_error_to_db(db_manager, kis_auth, context, detailed_error)
                             raise RuntimeError(f"{context}: {detailed_error}")
             except (ValueError, KeyError):
                 pass  # JSON 파싱 실패 시 기본 HTTP 에러 메시지 사용
             
             if attempt >= max_retries:
                 logger.error(f"{context}: HTTP error - {e}")
+                _save_api_error_to_db(db_manager, kis_auth, context, f"HTTP error: {e}")
                 raise
         except Exception as e:
             logger.error(f"{context}: Unexpected error - {e} (attempt {attempt + 1})")
             if attempt >= max_retries:
+                _save_api_error_to_db(db_manager, kis_auth, context, f"Unexpected error: {e}")
                 raise
     
     # 모든 재시도 실패
+    _save_api_error_to_db(db_manager, kis_auth, context, f"Failed after {max_retries} retries")
     raise RuntimeError(f"{context}: Failed after {max_retries} retries")
 
 
