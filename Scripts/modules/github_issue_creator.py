@@ -7,6 +7,7 @@ GitHub Copilot Coding Agent를 할당하는 모듈.
 
 import logging
 import os
+import requests
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -60,6 +61,8 @@ class GitHubIssueCreator:
                 "'pip install PyGitHub'를 실행하세요."
             )
 
+        self._token = token
+        self._repo_name = repo_name
         self._github = Github(token)
         self._repo = self._github.get_repo(repo_name)
         self._max_issues: int = int(
@@ -119,45 +122,61 @@ class GitHubIssueCreator:
         issue,
         username: Optional[str] = None,
     ) -> bool:
-        """생성된 Issue에 GitHub Copilot Coding Agent를 활성화한다.
+        """생성된 Issue에 GitHub Copilot Coding Agent를 할당한다.
 
-        Copilot Agent는 일반 assignee API로 지정할 수 없다. Issue 댓글에
-        @copilot 멘션을 추가하는 방식으로 Copilot Agent를 활성화한다.
+        PyGitHub는 agent_assignment 파라미터를 지원하지 않으므로,
+        GitHub REST API를 직접 호출하여 copilot-swe-agent[bot]을 assignee로
+        지정하고 agent_assignment를 함께 전달한다.
 
         COPILOT_AGENT_USERNAME 환경변수가 설정되어 있지 않거나 비어 있으면
-        건너뛴다. 댓글 작성 실패 시 로그를 기록하고 False를 반환하여
-        파이프라인이 계속 진행될 수 있게 한다.
+        건너뛴다. 실패 시 로그를 기록하고 False를 반환하여 파이프라인이
+        계속 진행될 수 있게 한다.
 
         Args:
             issue: PyGitHub Issue 객체
-            username: 사용하지 않음 (하위 호환성 유지용). None이면 환경변수에서 읽는다.
+            username: 사용하지 않음 (하위 호환성 유지용)
 
         Returns:
-            댓글 작성 성공 시 True, 건너뛰거나 실패 시 False.
+            할당 성공 시 True, 건너뛰거나 실패 시 False.
         """
-        agent_username = username or os.environ.get("COPILOT_AGENT_USERNAME", "").strip()
+        agent_username = os.environ.get("COPILOT_AGENT_USERNAME", "").strip()
 
         if not agent_username:
             logger.debug(
-                "COPILOT_AGENT_USERNAME이 설정되지 않아 Copilot Agent 활성화를 건너뜁니다."
+                "COPILOT_AGENT_USERNAME이 설정되지 않아 Copilot Agent 할당을 건너뜁니다."
             )
             return False
 
+        url = (
+            f"https://api.github.com/repos/{self._repo_name}"
+            f"/issues/{issue.number}/assignees"
+        )
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {self._token}",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        payload = {
+            "assignees": ["copilot-swe-agent[bot]"],
+            "agent_assignment": {
+                "target_repo": self._repo_name,
+                "base_branch": "main",
+                "custom_instructions": "",
+            },
+        }
+
         try:
-            issue.create_comment(
-                f"@{agent_username} 이 Issue를 분석하고 수정해 주세요."
-            )
+            response = requests.post(url, headers=headers, json=payload, timeout=10)
+            response.raise_for_status()
             logger.info(
-                "Issue #%d에 @%s 멘션 댓글 작성 완료 — Copilot Agent 활성화",
+                "Issue #%d에 Copilot Agent 할당 완료 (copilot-swe-agent[bot])",
                 issue.number,
-                agent_username,
             )
             return True
         except Exception as exc:
             logger.warning(
-                "Issue #%d Copilot Agent 활성화 실패 (%s): %s — 파이프라인 계속 진행",
+                "Issue #%d Copilot Agent 할당 실패: %s — 파이프라인 계속 진행",
                 issue.number,
-                agent_username,
                 exc,
             )
             return False
