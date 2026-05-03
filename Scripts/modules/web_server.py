@@ -13,6 +13,7 @@ from flask import Flask, render_template, jsonify, request
 import json
 from pathlib import Path
 
+import Scripts
 from .config_loader import get_config, get_portfolio_config
 from .kis_auth import KISAuth
 from .kis_portfolio_fetcher import KISPortfolioFetcher
@@ -117,9 +118,16 @@ class PortfolioWebServer:
                 logger.error(f"Portfolio API error: {e}")
                 return jsonify({'error': str(e)}), 500
         
+        @self.app.route('/api/version')
+        def get_version():
+            """앱 버전 정보 API"""
+            return jsonify({
+                'version': Scripts.__version__,
+                'environment': self.env
+            })
+
         @self.app.route('/health')
-        def health_check():
-            """헬스 체크 API"""
+        def health_check():            """헬스 체크 API"""
             return jsonify({
                 'status': 'healthy',
                 'timestamp': datetime.now().isoformat(),

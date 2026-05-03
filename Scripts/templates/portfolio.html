@@ -218,6 +218,13 @@
             margin-top: 2rem;
         }
         
+        .page-footer {
+            text-align: center;
+            padding: 1.5rem 0 0.5rem 0;
+            color: #aaa;
+            font-size: 0.8rem;
+        }
+        
         .refresh-btn {
             background: #667eea;
             color: white;
@@ -524,6 +531,10 @@
         </div>
     </div>
 
+    <footer class="page-footer">
+        <span id="appVersion">-</span>
+    </footer>
+
     <script>
         let chart = null;
         let currentDbTab = 'trading-history';
@@ -537,6 +548,18 @@
         // 페이지 로드 시 데이터 가져오기
         window.addEventListener('DOMContentLoaded', function() {
             console.log('DOM Content Loaded, initializing data...');
+            
+            // 앱 버전 정보 로드
+            fetch('/api/version')
+                .then(res => res.json())
+                .then(data => {
+                    const el = document.getElementById('appVersion');
+                    if (el) el.textContent = 'v' + data.version;
+                })
+                .catch(() => {
+                    const el = document.getElementById('appVersion');
+                    if (el) el.textContent = '-';
+                });
             
             // 먼저 DOM 요소들이 존재하는지 확인
             const dbContainer = document.getElementById('database');
