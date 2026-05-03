@@ -2,7 +2,7 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: log-collector
-  namespace: default
+  namespace: investment-auto
   labels:
     app: log-collector
 spec:
@@ -22,19 +22,56 @@ spec:
         spec:
           serviceAccountName: log-collector
           restartPolicy: OnFailure
-          containers:
-            - name: log-collector
-              # TODO: 실제 이미지 태그로 교체하세요
+
+          # initContainer: git clone + pip install (메인 서비스와 동일한 패턴)
+          initContainers:
+            - name: git-clone
               image: python:3.11-slim
               imagePullPolicy: IfNotPresent
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -e
+                  echo "Installing git..."
+                  apt-get update && apt-get install -y --no-install-recommends git
+                  
+                  echo "Cloning repository..."
+                  git clone --depth 1 --branch main https://github.com/ernati/Investment_Auto.git /app
+                  
+                  echo "Installing Python dependencies to /app/libs..."
+                  pip install --no-cache-dir --target=/app/libs \
+                    PyGitHub>=2.3.0 kubernetes>=29.0.0
+                  
+                  echo "Initialization complete!"
+              volumeMounts:
+                - name: app-code
+                  mountPath: /app
+                - name: pip-cache
+                  mountPath: /root/.cache/pip
+              resources:
+                requests:
+                  cpu: "100m"
+                  memory: "256Mi"
+                limits:
+                  cpu: "500m"
+                  memory: "512Mi"
+
+          containers:
+            - name: log-collector
+              image: python:3.11-slim
+              imagePullPolicy: IfNotPresent
+              workingDir: /app
               command:
                 - python
                 - -m
                 - Scripts.apps.log_autoissue_runner
               env:
+                # Python 패키지 경로 (initContainer에서 /app/libs에 설치)
+                - name: PYTHONPATH
+                  value: "/app/libs:/app/Scripts"
                 # 수집 대상 설정
                 - name: LOG_NAMESPACE
-                  value: "default"
+                  value: "investment-auto"
                 - name: LOG_LABEL_SELECTOR
                   value: "app=investment-auto"
                 # Copilot Agent 할당 (선택 사항)
@@ -54,6 +91,9 @@ spec:
                     secretKeyRef:
                       name: log-collector-secrets
                       key: GITHUB_REPO
+              volumeMounts:
+                - name: app-code
+                  mountPath: /app
               resources:
                 requests:
                   cpu: "100m"
@@ -61,3 +101,9 @@ spec:
                 limits:
                   cpu: "500m"
                   memory: "256Mi"
+
+          volumes:
+            - name: app-code
+              emptyDir: {}
+            - name: pip-cache
+              emptyDir: {}
