@@ -119,38 +119,43 @@ class GitHubIssueCreator:
         issue,
         username: Optional[str] = None,
     ) -> bool:
-        """생성된 Issue에 GitHub Copilot Coding Agent를 assignee로 할당한다.
+        """생성된 Issue에 GitHub Copilot Coding Agent를 활성화한다.
+
+        Copilot Agent는 일반 assignee API로 지정할 수 없다. Issue 댓글에
+        @copilot 멘션을 추가하는 방식으로 Copilot Agent를 활성화한다.
 
         COPILOT_AGENT_USERNAME 환경변수가 설정되어 있지 않거나 비어 있으면
-        할당을 건너뛴다. 할당 API 실패 시 로그를 기록하고 False를 반환하여
+        건너뛴다. 댓글 작성 실패 시 로그를 기록하고 False를 반환하여
         파이프라인이 계속 진행될 수 있게 한다.
 
         Args:
             issue: PyGitHub Issue 객체
-            username: 할당할 GitHub 사용자명. None이면 환경변수에서 읽는다.
+            username: 사용하지 않음 (하위 호환성 유지용). None이면 환경변수에서 읽는다.
 
         Returns:
-            할당 성공 시 True, 건너뛰거나 실패 시 False.
+            댓글 작성 성공 시 True, 건너뛰거나 실패 시 False.
         """
         agent_username = username or os.environ.get("COPILOT_AGENT_USERNAME", "").strip()
 
         if not agent_username:
             logger.debug(
-                "COPILOT_AGENT_USERNAME이 설정되지 않아 Copilot Agent 할당을 건너뜁니다."
+                "COPILOT_AGENT_USERNAME이 설정되지 않아 Copilot Agent 활성화를 건너뜁니다."
             )
             return False
 
         try:
-            issue.add_to_assignees(agent_username)
+            issue.create_comment(
+                f"@{agent_username} 이 Issue를 분석하고 수정해 주세요."
+            )
             logger.info(
-                "Issue #%d에 Copilot Agent 할당 완료: %s",
+                "Issue #%d에 @%s 멘션 댓글 작성 완료 — Copilot Agent 활성화",
                 issue.number,
                 agent_username,
             )
             return True
         except Exception as exc:
             logger.warning(
-                "Issue #%d Copilot Agent 할당 실패 (%s): %s — 파이프라인 계속 진행",
+                "Issue #%d Copilot Agent 활성화 실패 (%s): %s — 파이프라인 계속 진행",
                 issue.number,
                 agent_username,
                 exc,
