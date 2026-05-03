@@ -127,7 +127,8 @@ class PortfolioWebServer:
             })
 
         @self.app.route('/health')
-        def health_check():            """헬스 체크 API"""
+        def health_check():
+            """헬스 체크 API"""
             return jsonify({
                 'status': 'healthy',
                 'timestamp': datetime.now().isoformat(),
