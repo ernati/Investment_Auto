@@ -57,12 +57,8 @@ spec:
         syncOptions:
           # 네임스페이스가 없으면 자동 생성
           - CreateNamespace=true
-          # Server-Side Apply 사용 (더 안전한 리소스 관리)
-          - ServerSideApply=true
           # Prune 전에 모든 리소스가 동기화될 때까지 대기
           - PrunePropagationPolicy=foreground
-          # 리소스 적용 순서 지정
-          - ApplyOutOfSyncOnly=true
         
         retry:
           limit: 5
