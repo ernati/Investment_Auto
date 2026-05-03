@@ -18,7 +18,7 @@ try:
     import psycopg2
     from psycopg2 import OperationalError, DatabaseError
     from psycopg2.extras import RealDictCursor
-    from psycopg2.errorcodes import UNDEFINED_TABLE
+    from psycopg2.errorcodes import UNDEFINED_TABLE, CANNOT_CONNECT_NOW
     PSYCOPG2_AVAILABLE = True
 except ImportError:
     PSYCOPG2_AVAILABLE = False
@@ -30,6 +30,9 @@ from .db_models import (
 )
 
 logger = logging.getLogger(__name__)
+
+# PostgreSQL 기동/복구 중(57P03) 연결 재시도 시 기본 backoff 대비 배율
+_STARTUP_WAIT_MULTIPLIER = 4
 
 
 class DatabaseManager:
@@ -117,11 +120,21 @@ class DatabaseManager:
             
             except OperationalError as e:
                 last_error = e
-                logger.warning(
-                    f"Database connection failed (attempt {attempt + 1}/{retry_max + 1}): {e}"
-                )
+                # PostgreSQL 기동/복구 중(57P03 CANNOT_CONNECT_NOW)인 경우 더 길게 대기
+                is_starting_up = getattr(e, "pgcode", None) == CANNOT_CONNECT_NOW
+                if is_starting_up:
+                    wait_time = retry_backoff * (attempt + 1) * _STARTUP_WAIT_MULTIPLIER
+                    logger.warning(
+                        f"PostgreSQL is starting up, retrying in {wait_time:.1f}s "
+                        f"(attempt {attempt + 1}/{retry_max + 1})"
+                    )
+                else:
+                    wait_time = retry_backoff * (attempt + 1)
+                    logger.warning(
+                        f"Database connection failed (attempt {attempt + 1}/{retry_max + 1}): {e}"
+                    )
                 if attempt < retry_max:
-                    time.sleep(retry_backoff * (attempt + 1))
+                    time.sleep(wait_time)
         
         logger.error(f"Database connection failed after {retry_max + 1} attempts")
         raise last_error

@@ -7,8 +7,8 @@
         "password": "temp1234",
         "sslmode": "prefer",
         "connect_timeout": 5,
-        "retry_max": 3,
-        "retry_backoff": 0.5
+        "retry_max": 10,
+        "retry_backoff": 2.0
     },
     "table_config": {
         "trading_history": {

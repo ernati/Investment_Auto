@@ -142,6 +142,14 @@ officialPostgresql:
   service:
     type: ClusterIP
     port: 5432
+  # 시작/복구 시 충분한 대기를 허용하는 startupProbe 설정
+  # periodSeconds * failureThreshold = 최대 기동 허용 시간 (5 * 60 = 300초)
+  startupProbe:
+    enabled: true
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 5
+    failureThreshold: 60
 
 # -----------------------------------------------------------------------------
 # ConfigMap 설정 (스케줄러 설정만 - DB 설정은 Config/database.json에서 로드)
