@@ -75,7 +75,7 @@ spec:
                   value: "app.kubernetes.io/name=investment-auto"
                 # Copilot Agent 할당 (선택 사항)
                 - name: COPILOT_AGENT_USERNAME
-                  value: ""
+                  value: "Copilot"
                 # 실행 당 최대 Issue 생성 수
                 - name: MAX_ISSUES_PER_RUN
                   value: "5"
