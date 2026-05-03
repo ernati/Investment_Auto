@@ -1,0 +1,36 @@
+name: Deploy - Update Helm Timestamp
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'deployment/helm/values.yaml'
+
+permissions:
+  contents: write
+
+jobs:
+  update-deploy-timestamp:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update deployTimestamp in values.yaml
+        run: |
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          sed -i "s|^deployTimestamp:.*|deployTimestamp: \"${TIMESTAMP}\"|" deployment/helm/values.yaml
+          echo "Updated deployTimestamp to: ${TIMESTAMP}"
+
+      - name: Commit and push updated values.yaml
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add deployment/helm/values.yaml
+          git diff --staged --quiet && echo "No changes to commit" && exit 0
+          git commit -m "[ci] Update deployTimestamp to trigger ArgoCD redeploy"
+          git pull --rebase origin main
+          git push origin main
