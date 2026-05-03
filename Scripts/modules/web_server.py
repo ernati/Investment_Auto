@@ -13,7 +13,6 @@ from flask import Flask, render_template, jsonify, request
 import json
 from pathlib import Path
 
-import Scripts
 from .config_loader import get_config, get_portfolio_config
 from .kis_auth import KISAuth
 from .kis_portfolio_fetcher import KISPortfolioFetcher
@@ -121,8 +120,16 @@ class PortfolioWebServer:
         @self.app.route('/api/version')
         def get_version():
             """앱 버전 정보 API"""
+            try:
+                from .. import __version__ as _version
+            except ImportError:
+                try:
+                    import Scripts
+                    _version = Scripts.__version__
+                except ImportError:
+                    _version = 'unknown'
             return jsonify({
-                'version': Scripts.__version__,
+                'version': _version,
                 'environment': self.env
             })
 
