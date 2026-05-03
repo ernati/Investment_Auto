@@ -1,0 +1,63 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: log-collector
+  namespace: default
+  labels:
+    app: log-collector
+spec:
+  # 매일 오전 9시 (KST 기준 00:00 UTC)에 실행
+  schedule: "0 0 * * *"
+  # 동시 실행 방지
+  concurrencyPolicy: Forbid
+  # 실패한 Job 보관 수
+  failedJobsHistoryLimit: 3
+  successfulJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: log-collector
+        spec:
+          serviceAccountName: log-collector
+          restartPolicy: OnFailure
+          containers:
+            - name: log-collector
+              # TODO: 실제 이미지 태그로 교체하세요
+              image: python:3.11-slim
+              imagePullPolicy: IfNotPresent
+              command:
+                - python
+                - -m
+                - Scripts.apps.log_autoissue_runner
+              env:
+                # 수집 대상 설정
+                - name: LOG_NAMESPACE
+                  value: "default"
+                - name: LOG_LABEL_SELECTOR
+                  value: "app=investment-auto"
+                # Copilot Agent 할당 (선택 사항)
+                - name: COPILOT_AGENT_USERNAME
+                  value: ""
+                # 실행 당 최대 Issue 생성 수
+                - name: MAX_ISSUES_PER_RUN
+                  value: "5"
+                # GitHub 인증 정보 (Secret에서 주입)
+                - name: GITHUB_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: log-collector-secrets
+                      key: GITHUB_TOKEN
+                - name: GITHUB_REPO
+                  valueFrom:
+                    secretKeyRef:
+                      name: log-collector-secrets
+                      key: GITHUB_REPO
+              resources:
+                requests:
+                  cpu: "100m"
+                  memory: "128Mi"
+                limits:
+                  cpu: "500m"
+                  memory: "256Mi"
