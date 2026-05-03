@@ -39,8 +39,7 @@ spec:
                   git clone --depth 1 --branch main https://github.com/ernati/Investment_Auto.git /app
                   
                   echo "Installing Python dependencies to /app/libs..."
-                  pip install --no-cache-dir --target=/app/libs \
-                    PyGitHub>=2.3.0 kubernetes>=29.0.0
+                  pip install --no-cache-dir --target=/app/libs -r /app/requirements.txt
                   
                   echo "Initialization complete!"
               volumeMounts:
