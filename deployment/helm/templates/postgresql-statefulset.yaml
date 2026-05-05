@@ -50,6 +50,7 @@ spec:
             periodSeconds: {{ .Values.officialPostgresql.startupProbe.periodSeconds }}
             timeoutSeconds: {{ .Values.officialPostgresql.startupProbe.timeoutSeconds }}
             failureThreshold: {{ .Values.officialPostgresql.startupProbe.failureThreshold }}
+            successThreshold: {{ .Values.officialPostgresql.startupProbe.successThreshold }}
           {{- end }}
           livenessProbe:
             exec:

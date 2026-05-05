@@ -31,8 +31,11 @@ from .db_models import (
 
 logger = logging.getLogger(__name__)
 
-# PostgreSQL 기동/복구 중(57P03) 연결 재시도 시 기본 backoff 대비 배율
+# PostgreSQL 기동/복구 중(57P03) 연결 재시도 시 일반 backoff 대비 대기 배율.
+# 복구(crash recovery)는 수 초~수십 초가 소요되므로 일반 네트워크 에러보다 길게 대기합니다.
 _STARTUP_WAIT_MULTIPLIER = 4
+# 단일 재시도 시 최대 대기 시간(초). 선형 backoff가 과도하게 누적되는 것을 방지합니다.
+_MAX_RETRY_WAIT_SECONDS = 60.0
 
 
 class DatabaseManager:
@@ -123,13 +126,19 @@ class DatabaseManager:
                 # PostgreSQL 기동/복구 중(57P03 CANNOT_CONNECT_NOW)인 경우 더 길게 대기
                 is_starting_up = getattr(e, "pgcode", None) == CANNOT_CONNECT_NOW
                 if is_starting_up:
-                    wait_time = retry_backoff * (attempt + 1) * _STARTUP_WAIT_MULTIPLIER
+                    wait_time = min(
+                        retry_backoff * (attempt + 1) * _STARTUP_WAIT_MULTIPLIER,
+                        _MAX_RETRY_WAIT_SECONDS
+                    )
                     logger.warning(
-                        f"PostgreSQL is starting up, retrying in {wait_time:.1f}s "
-                        f"(attempt {attempt + 1}/{retry_max + 1})"
+                        f"PostgreSQL is starting up (57P03), retrying in {wait_time:.1f}s "
+                        f"(attempt {attempt + 1}/{retry_max + 1}): {e}"
                     )
                 else:
-                    wait_time = retry_backoff * (attempt + 1)
+                    wait_time = min(
+                        retry_backoff * (attempt + 1),
+                        _MAX_RETRY_WAIT_SECONDS
+                    )
                     logger.warning(
                         f"Database connection failed (attempt {attempt + 1}/{retry_max + 1}): {e}"
                     )
