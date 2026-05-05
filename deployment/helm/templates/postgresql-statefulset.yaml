@@ -39,6 +39,19 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
+          {{- if .Values.officialPostgresql.startupProbe.enabled }}
+          startupProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - exec pg_isready -U {{ .Values.officialPostgresql.auth.username | quote }} -d {{ .Values.officialPostgresql.auth.database | quote }} -h 127.0.0.1 -p 5432
+            initialDelaySeconds: {{ .Values.officialPostgresql.startupProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.officialPostgresql.startupProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.officialPostgresql.startupProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.officialPostgresql.startupProbe.failureThreshold }}
+            successThreshold: {{ .Values.officialPostgresql.startupProbe.successThreshold }}
+          {{- end }}
           livenessProbe:
             exec:
               command:
